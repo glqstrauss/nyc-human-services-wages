@@ -7,13 +7,13 @@ steps <- c(
   "replication/R/00_setup.R",
   "replication/R/01_acs_prep.R",
   # "replication/R/02_ces_prep.R",   # TODO
-  # "replication/R/03_qcew_prep.R",  # TODO
+  "replication/R/03_qcew_prep.R",
 
   # Analysis (1x)
   "replication/R/10_demographics.R",
   "replication/R/11_wages.R",
   "replication/R/12_hardship.R",
-  # "replication/R/13_qcew_ranking.R", # TODO
+  "replication/R/13_qcew_ranking.R",
 
   # Output (2x)
   "replication/R/20_figures.R"
