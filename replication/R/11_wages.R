@@ -1,5 +1,5 @@
 # =============================================================================
-# 03_wages.R
+# 11_wages.R
 # Module 4: Wage Comparison Tables
 #
 # Computes all wage comparison tables replicating Parrott et al. findings on

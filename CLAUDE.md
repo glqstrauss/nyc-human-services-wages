@@ -18,7 +18,7 @@ human_services_wages/
 ├── replication/
 │   ├── data/raw/         # ipums/, qcew/, ces/, omb/
 │   ├── data/processed/
-│   ├── R/                # 00_setup.R through 07_figures.R
+│   ├── R/                # 0x = data prep, 1x = analysis, 2x = figures
 │   └── output/figures/
 └── extension/
     ├── data/raw/         # ipums_multicity/, ipums_longitudinal/, ces/
@@ -38,7 +38,7 @@ The industry/occupation filter that defines "core human services workers" lives 
 VS Code with `reditorsupport.r` extension; `languageserver` installed for IDE integration.
 
 ```bash
-Rscript replication/R/03_wages.R        # run a script
+Rscript replication/R/11_wages.R        # run a script
 Rscript -e "source('R/01_acs_prep.R')"  # source interactively
 ```
 

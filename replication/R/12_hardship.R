@@ -1,4 +1,4 @@
-# 04_hardship.R
+# 12_hardship.R
 # Module 6: Economic hardship indicators — SNAP receipt and poverty rates.
 # Replicates figures from Parrott (2025) showing food insecurity and low income
 # among core human services workers vs. public and private sector workers.

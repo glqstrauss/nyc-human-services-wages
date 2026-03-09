@@ -1,5 +1,5 @@
 # =============================================================================
-# 02_demographics.R
+# 10_demographics.R
 # Module 3: Workforce Demographic and Education Composition
 #
 # Replicates Figures 4-8 from:
@@ -407,4 +407,4 @@ out_path <- file.path(PROC_DIR, "demographics_tables.rds")
 saveRDS(demographics_tables, out_path)
 message(sprintf("  Saved: %s", out_path))
 
-message("\n02_demographics.R complete.\n")
+message("\n10_demographics.R complete.\n")

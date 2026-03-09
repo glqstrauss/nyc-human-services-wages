@@ -233,13 +233,14 @@ replication/
 │   └── processed/
 ├── R/
 │   ├── 00_setup.R          # package loading, constants, paths
-│   ├── 01_acs_prep.R       # load + clean IPUMS extract; define industry/occ filter functions
-│   ├── 02_demographics.R   # Module 3: workforce composition
-│   ├── 03_wages.R          # Module 4: all wage comparison tables
-│   ├── 04_qcew.R           # Module 5: industry wage ranking
-│   ├── 05_ces.R            # Module 1: employment growth trends
-│   ├── 06_omb.R            # Module 2: contract spending
-│   └── 07_figures.R        # assemble all ggplot figures
+│   ├── 01_acs_prep.R       # load + clean IPUMS extract; industry/occ filters
+│   ├── 02_ces_prep.R       # download + clean BLS CES series
+│   ├── 03_qcew_prep.R      # download + clean QCEW annual data
+│   ├── 10_demographics.R   # workforce composition (Figs 4-8)
+│   ├── 11_wages.R          # wage comparison tables (Figs 10-15)
+│   ├── 12_hardship.R       # SNAP receipt + poverty (Module 6)
+│   ├── 13_qcew_ranking.R   # industry wage ranking (Fig 9)
+│   └── 20_figures.R        # assemble all ggplot figures
 └── output/figures/
 ```
 

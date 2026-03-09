@@ -1,6 +1,6 @@
-# 07_figures.R
+# 20_figures.R
 # Assemble all ggplot figures from saved analysis tables.
-# Run after 02_demographics.R, 03_wages.R, and 04_hardship.R.
+# Run after 10_demographics.R, 11_wages.R, and 12_hardship.R.
 #
 # Inputs:  replication/data/processed/{demographics,wage,hardship}_tables.rds
 # Outputs: replication/output/figures/*.png
