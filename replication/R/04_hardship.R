@@ -29,22 +29,21 @@ svy <- d_hw |>
   as_survey_design(weights = PERWT)
 
 # ── Alternative universe definitions for HS nonprofit group (additive) ────────
-# Narrow (current): is_hs == TRUE  = Social Asst nonprofit, excl. homecare OCC
-# Broad1:           Social Asst nonprofit, INCLUDE homecare OCC
-# Broad2:           All Social Asst workers, any sector, any OCC
+# Narrow: is_hs_wages == TRUE = HS industry nonprofit, excl. homecare OCC
+# Broad1: is_hs == TRUE       = HS industry nonprofit, INCLUDE homecare OCC
+# Broad2: in_hs_industry      = All HS industry workers, any sector, any OCC
 #
-# Note: `in_social_asst` and `sector` are available from acs_prepared.rds.
-# `homecare_occ` is also available as a column.
+# Note: `in_hs_industry` and `sector` are available from acs_prepared.rds.
 
 d_broad1 <- d |>
-  filter(in_social_asst, sector == "priv_nonprofit") |>   # same sector, add homecare
+  filter(is_hs) |>   # broad: includes homecare occupations
   mutate(
     snap_receipt = FOODSTMP == 2L,
     below_200pct = POVERTY < 200 & POVERTY > 0
   )
 
 d_broad2 <- d |>
-  filter(in_social_asst) |>                               # all sectors, all OCC
+  filter(in_hs_industry) |>   # all sectors, all OCC
   mutate(
     snap_receipt = FOODSTMP == 2L,
     below_200pct = POVERTY < 200 & POVERTY > 0
@@ -96,8 +95,8 @@ h1 <- h1 |>
 print(h1 |> select(sector, snap_rate_pct, snap_rate_broad1_pct, snap_rate_broad2_pct,
                    n_weighted, n_weighted_broad1, n_weighted_broad2))
 cat("\nParrott target: hs_nonprofit ~19%, govt ~11%, priv_forprofit ~14%\n")
-cat("broad1 = Social Asst nonprofit incl. homecare OCC\n")
-cat("broad2 = All Social Asst workers any sector\n")
+cat("broad1 = HS industry nonprofit incl. homecare OCC\n")
+cat("broad2 = All HS industry workers any sector\n")
 
 # ── Table H2: Below 200% poverty rate by sector ───────────────────────────────
 # Parrott finding: 16% of HS workers below 200% FPL vs. 10% public sector.
@@ -145,8 +144,8 @@ h2 <- h2 |>
 print(h2 |> select(sector, below_200pct_pct, below_200pct_broad1_pct, below_200pct_broad2_pct,
                    n_weighted, n_weighted_broad1, n_weighted_broad2))
 cat("\nParrott target: hs_nonprofit ~16%, govt ~10%, all private ~19%\n")
-cat("broad1 = Social Asst nonprofit incl. homecare OCC\n")
-cat("broad2 = All Social Asst workers any sector\n")
+cat("broad1 = HS industry nonprofit incl. homecare OCC\n")
+cat("broad2 = All HS industry workers any sector\n")
 
 # ── Save ──────────────────────────────────────────────────────────────────────
 

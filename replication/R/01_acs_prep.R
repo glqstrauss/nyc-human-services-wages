@@ -46,36 +46,37 @@ d <- d |>
 
 # ── 4. Core human services flag ───────────────────────────────────────────────
 # Definition (Parrott 2025):
-#   - Industry: Social Assistance (NAICS 624) excluding Child Day Care (6244)
-#   - Occupation: exclude home health aides, personal care aides, nursing assistants
+#   - Industry: Social Assistance (NAICS 624) + Residential Care (NAICS 623),
+#     excluding Child Day Care Services (NAICS 6244)
 #   - Sector: nonprofit only (CLASSWKRD == 23)
 #
-# The `is_hs` flag is the primary sample flag for the "human services nonprofit"
-# comparison group. The broader `in_social_asst` flag is used for sector-level
-# comparisons within the industry.
-
-# d <- d |>
-#   mutate(
-#     in_social_asst = grepl(INDNAICS_SOC_ASST, INDNAICS) &
-#       INDNAICS != INDNAICS_CHILD_CARE,
-#     homecare_occ = OCC %in% OCC_EXCLUDE_HOMECARE,
-#     is_hs = in_social_asst & !homecare_occ & sector == "hs_nonprofit"
-#   )
-
-
+# `is_hs` is the primary sample flag for demographics/headcount (Figs 4-8).
+# It does NOT exclude homecare occupations, matching the report's Figure 5
+# total of ~60,095 workers.
+#
+# `is_hs_wages` further excludes home health aides, personal care aides, and
+# nursing assistants. Used for wage analysis (Figs 10-15) because "including
+# [homecare workers] would have skewed the wage distribution downward"
+# (Parrott 2025, p. 9).
 
 d <- d |>
   mutate(
-    in_social_asst = grepl('^624', INDNAICS) & INDNAICS != '6244',
-    homecare_occ = OCC %in% c(3601L, 3602L,3603L),
-    in_care = grepl('^623', INDNAICS) & !homecare_occ,
-    is_hs = in_social_asst & !homecare_occ & sector == "hs_nonprofit"
+    in_hs_industry = grepl(INDNAICS_HS_INDUSTRY, INDNAICS) &
+      INDNAICS != INDNAICS_CHILD_CARE,
+    homecare_occ = OCC %in% OCC_EXCLUDE_HOMECARE,
+    is_hs = in_hs_industry &
+      !is.na(sector) & sector == "hs_nonprofit",
+    is_hs_wages = is_hs & !homecare_occ
   )
 
-
 message(paste(
-  "Core human services nonprofit workers (is_hs):",
-  format(sum(d$is_hs), big.mark = ","), "unweighted rows."
+  "Core HS nonprofit (is_hs):",
+  format(sum(d$is_hs), big.mark = ","), "unweighted,",
+  format(round(sum(d$PERWT[d$is_hs])), big.mark = ","), "weighted."
+))
+message(paste(
+  "  Wage-eligible (is_hs_wages, excl. homecare):",
+  format(sum(d$is_hs_wages), big.mark = ","), "unweighted."
 ))
 
 # Rename sector label for hs_nonprofit to be explicit
@@ -179,17 +180,26 @@ message("Core HS nonprofit full-time workers by occupation group (unweighted):")
 print(check_occ)
 
 # ── 11. Three-way analysis sector variable ────────────────────────────────────
-# Clean classification for all downstream wage and demographic tables:
-#   "hs_nonprofit"   = core human services nonprofit workers (is_hs == TRUE)
+# Clean classification for all downstream demographic and wage tables:
+#   "hs_nonprofit"   = core human services nonprofit workers
 #   "govt"           = all government workers
 #   "priv_forprofit" = all private for-profit workers (any industry)
 # Workers not in these three groups (other nonprofits, self-employed) get NA.
+#
+# analysis_sector uses is_hs (broad, for demographics).
+# analysis_sector_wages uses is_hs_wages (excl. homecare, for wage tables).
 
 d <- d |>
   mutate(
     analysis_sector = case_when(
       is_hs ~ "hs_nonprofit",
-      sector == "govt" ~ "govt",
+      sector %in% c("local_govt", "other_govt") ~ "govt",
+      sector == "priv_forprofit" ~ "priv_forprofit",
+      TRUE ~ NA_character_
+    ) |> factor(levels = c("hs_nonprofit", "govt", "priv_forprofit")),
+    analysis_sector_wages = case_when(
+      is_hs_wages ~ "hs_nonprofit",
+      sector %in% c("local_govt", "other_govt") ~ "govt",
       sector == "priv_forprofit" ~ "priv_forprofit",
       TRUE ~ NA_character_
     ) |> factor(levels = c("hs_nonprofit", "govt", "priv_forprofit"))

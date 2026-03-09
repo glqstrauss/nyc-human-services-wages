@@ -77,13 +77,14 @@ Plus two supplemental benchmarks: True Cost of Living and fringe benefit estimat
 ## Defining "Core Human Services" Workers
 
 ### In ACS microdata (industry + occupation filters)
-1. **Industry filter**: Retain observations in the Social Assistance industry, **excluding** the Child Day Care Services sub-industry.
-   - Determine the correct IPUMS `ind` codes for: Social Assistance (NAICS 624) and Child Day Care Services (NAICS 6244).
-2. **Occupation exclusion**: Within the remaining Social Assistance industry workers, exclude all workers in home health aide and personal care aide occupations.
-   - Determine the correct IPUMS `occ` codes for: Home Health Aides, Personal Care Aides, and Nursing Assistants.
+1. **Industry filter**: Retain observations in Social Assistance (NAICS 624) **and** Residential Care Facilities (NAICS 623), **excluding** Child Day Care Services (NAICS 6244).
+   - NAICS 623 captures group homes, residential mental health/substance abuse facilities, supportive housing, and I/DD residences — all major NYC human services contract areas.
+   - IPUMS `INDNAICS` codes: 6241, 6242, 6243 (under 624); 6231, 623M (under 623).
+2. **Occupation exclusion (wage analysis only)**: For wage tables (Figures 10–15), exclude home health aides, personal care aides, and nursing assistants. This exclusion is **not** applied for demographic headcounts (Figures 4–8), matching the report's Figure 5 total of ~60,095 workers.
+   - IPUMS `occ` codes: 3601 (Home Health Aides), 3602 (Personal Care Aides), 3603 (Nursing Assistants).
 3. **Sector split**: Within this universe, further split by `classwkr`:
-   - Private nonprofit / private for-profit = "core human services workers"
-   - Government = "public sector human services" (not used as the human services group, but as comparator)
+   - Private nonprofit = "core human services workers" (primary analysis group)
+   - Government = "public sector" (comparator)
 
 ### Key occupations of interest for occupation-level wage tables
 Determine the correct IPUMS `occ` codes for:

@@ -47,12 +47,21 @@ CLASSWKRD_OTHER_GOVT <- c(24,25,27)
 
 # ── INDNAICS codes ───────────────────────────────────────────────────────────
 # INDNAICS is an alphanumeric string in this extract.
-# Social Assistance sector (NAICS 624): INDNAICS starts with "624"
-# Child Day Care Services (NAICS 6244): INDNAICS == "6244"  -- EXCLUDE
-# Individual & Family Services (NAICS 6241): INDNAICS == "6241"
-# General Medical & Surgical Hospitals (NAICS 6221): INDNAICS == "6221"
+#
+# Core human services industry definition (Parrott 2025):
+#   NAICS 624 — Social Assistance (6241, 6242, 6243, plus merged codes)
+#   NAICS 623 — Residential Care Facilities (6231, 623M)
+#   EXCLUDE:  6244 — Child Day Care Services
+#
+# The 623 codes capture group homes, residential mental health/substance abuse
+# facilities, supportive housing, and I/DD residences — all major components
+# of NYC human services contracting (DOHMH, DHS, HRA program areas).
+#
+# This broader definition yields ~61k weighted nonprofit workers, matching the
+# report's Figure 5 total of 60,095. The original ^624-only definition yielded
+# only ~48k, which was too narrow.
 
-INDNAICS_SOC_ASST     <- "^624"    # regex: all Social Assistance sub-industries
+INDNAICS_HS_INDUSTRY  <- "^62[34]" # regex: Social Assistance + Residential Care
 INDNAICS_CHILD_CARE   <- "6244"    # exact: child day care -- EXCLUDE
 INDNAICS_PRIV_HOSP    <- "621M"    # ACS PUMS merged hospital code (covers NAICS 6221)
 

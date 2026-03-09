@@ -310,7 +310,7 @@ tbl4_priv <- svy_ft |>
   compute_educ_share("all_private")
 
 tbl4_govt <- svy_ft |>
-  filter(sector == "govt") |>
+  filter(sector %in% c("local_govt", "other_govt")) |>
   compute_educ_share("govt")
 
 tbl4 <- bind_rows(tbl4_hs, tbl4_priv, tbl4_govt) |>

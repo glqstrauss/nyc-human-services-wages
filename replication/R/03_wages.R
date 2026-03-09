@@ -50,18 +50,21 @@ CPI_FACTORS <- c(
 acs_wages <- acs_wages |>
   mutate(incwage_real = round(INCWAGE * CPI_FACTORS[as.character(MULTYEAR)]))
 
-# Three comparison sectors used throughout all wage tables (from analysis_sector):
-#   1. hs_nonprofit      — core human services nonprofit workers (is_hs == TRUE)
+# Three comparison sectors used throughout all wage tables:
+#   1. hs_nonprofit      — core HS nonprofit workers (is_hs_wages == TRUE;
+#                           excludes homecare occupations)
 #   2. govt              — all government workers
 #   3. priv_forprofit    — all private for-profit workers
 #
-# analysis_sector is constructed in 01_acs_prep.R; workers outside these three
-# groups have analysis_sector == NA and are dropped here.
+# analysis_sector_wages is constructed in 01_acs_prep.R; it uses is_hs_wages
+# (which excludes homecare occupations from the HS nonprofit group) to avoid
+# downward skew in the wage distribution. Workers outside these three groups
+# have analysis_sector_wages == NA and are dropped here.
 SECTORS_3 <- c("hs_nonprofit", "govt", "priv_forprofit")
 
 acs_3sec <- acs_wages |>
-  filter(!is.na(analysis_sector)) |>
-  mutate(sector = analysis_sector)  # alias for readability in this script
+  filter(!is.na(analysis_sector_wages)) |>
+  mutate(sector = analysis_sector_wages)
 
 # NOTE: survey::svyquantile has a version-compatibility issue with vctrs that
 # breaks srvyr's survey_median() inside summarise(). We instead use a manual
@@ -223,11 +226,11 @@ OCC_GROUPS <- c("social_workers", "counselors", "hs_assistants",
 # hospital population and sub-set only when computing gaps at occupation level.
 
 occ_hs   <- acs_wages |>
-  filter(is_hs == TRUE, occ_group %in% OCC_GROUPS) |>
+  filter(is_hs_wages == TRUE, occ_group %in% OCC_GROUPS) |>
   mutate(comp_sector = "hs_nonprofit")
 
 occ_govt <- acs_wages |>
-  filter(analysis_sector == "govt", occ_group %in% OCC_GROUPS) |>
+  filter(analysis_sector_wages == "govt", occ_group %in% OCC_GROUPS) |>
   mutate(comp_sector = "govt")
 
 occ_hosp <- acs_wages |>
@@ -340,12 +343,12 @@ w4_long <- acs_wages |>
   filter(
     occ_group %in% OCC_PROF,
     educ_cat  %in% EDUC_HIGH,
-    analysis_sector %in% SEC_2
+    analysis_sector_wages %in% SEC_2
   ) |>
   mutate(
     occ_group = factor(occ_group,        levels = OCC_PROF),
     educ_cat  = factor(as.character(educ_cat), levels = EDUC_HIGH),
-    sector    = factor(as.character(analysis_sector), levels = SEC_2)
+    sector    = factor(as.character(analysis_sector_wages), levels = SEC_2)
   ) |>
   group_by(occ_group, educ_cat, sector) |>
   summarise(
@@ -398,11 +401,11 @@ w5_long <- acs_wages |>
   filter(
     occ_group %in% OCC_PROF,
     educ_cat  %in% EDUC_HIGH,
-    analysis_sector %in% SEC_2
+    analysis_sector_wages %in% SEC_2
   ) |>
   mutate(
     educ_cat  = factor(as.character(educ_cat), levels = EDUC_HIGH),
-    sector    = factor(as.character(analysis_sector), levels = SEC_2),
+    sector    = factor(as.character(analysis_sector_wages), levels = SEC_2),
     race_grp  = if_else(poc, "poc", "white_nh")
   ) |>
   group_by(sector, educ_cat, race_grp) |>
