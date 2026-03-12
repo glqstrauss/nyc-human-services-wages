@@ -29,9 +29,9 @@ acs <- readRDS(file.path(PROC_DIR, "acs_prepared.rds"))
 
 acs_wages <- acs |>
   filter(
-    full_time    == TRUE,
-    INCWAGE      <  999999,
-    INCWAGE      >  0
+    full_time == TRUE,
+    INCWAGE < 999999,
+    INCWAGE > 0
   )
 
 # ── CPI-U deflation to 2022 dollars (additive) ───────────────────────────────
@@ -70,10 +70,17 @@ acs_3sec <- acs_wages |>
 # breaks srvyr's survey_median() inside summarise(). We instead use a manual
 # weighted median helper, which is equivalent for point estimates.
 wt_median <- function(x, w, na.rm = TRUE) {
-  if (na.rm) { keep <- !is.na(x) & !is.na(w); x <- x[keep]; w <- w[keep] }
-  if (length(x) == 0) return(NA_real_)
-  o   <- order(x)
-  x   <- x[o]; w <- w[o]
+  if (na.rm) {
+    keep <- !is.na(x) & !is.na(w)
+    x <- x[keep]
+    w <- w[keep]
+  }
+  if (length(x) == 0) {
+    return(NA_real_)
+  }
+  o <- order(x)
+  x <- x[o]
+  w <- w[o]
   cum <- cumsum(w) / sum(w)
   x[which(cum >= 0.5)[1]]
 }
@@ -105,7 +112,7 @@ cat("\n=== Table W1: Overall Median Wage by Sector ===\n")
 w1 <- acs_3sec |>
   group_by(sector) |>
   summarise(
-    median_wage      = wt_median(INCWAGE,      PERWT),
+    median_wage      = wt_median(INCWAGE, PERWT),
     median_wage_real = wt_median(incwage_real, PERWT),
     n_unweighted     = n(),
     n_weighted       = round(sum(PERWT))
@@ -136,10 +143,10 @@ cat("\n=== Table W2: Median Wage by Education × Sector (Figure 10) ===\n")
 w2_long <- acs_3sec |>
   group_by(educ_cat, sector) |>
   summarise(
-    median_wage      = wt_median(INCWAGE,      PERWT),
+    median_wage = wt_median(INCWAGE, PERWT),
     median_wage_real = wt_median(incwage_real, PERWT),
-    n_unweighted     = n(),
-    n_weighted       = round(sum(PERWT)),
+    n_unweighted = n(),
+    n_weighted = round(sum(PERWT)),
     .groups = "drop"
   )
 
@@ -147,16 +154,16 @@ w2_long <- acs_3sec |>
 w2_wide <- w2_long |>
   select(educ_cat, sector, median_wage) |>
   pivot_wider(
-    names_from  = sector,
+    names_from = sector,
     values_from = median_wage,
     names_prefix = "median_"
   ) |>
   mutate(
     # Gap: (comparison - hs_nonprofit) / comparison * 100
-    gap_vs_govt_pct       = round(
-      (median_govt        - median_hs_nonprofit) / median_govt        * 100, 1
+    gap_vs_govt_pct = round(
+      (median_govt - median_hs_nonprofit) / median_govt * 100, 1
     ),
-    gap_vs_forprofit_pct  = round(
+    gap_vs_forprofit_pct = round(
       (median_priv_forprofit - median_hs_nonprofit) / median_priv_forprofit * 100, 1
     )
   )
@@ -170,12 +177,12 @@ w2_n <- w2_long |>
 w2_wide_real <- w2_long |>
   select(educ_cat, sector, median_wage_real) |>
   pivot_wider(
-    names_from  = sector,
+    names_from = sector,
     values_from = median_wage_real,
     names_prefix = "median_real_"
   ) |>
   mutate(
-    gap_vs_govt_pct_real      = round(
+    gap_vs_govt_pct_real = round(
       (median_real_govt - median_real_hs_nonprofit) / median_real_govt * 100, 1
     ),
     gap_vs_forprofit_pct_real = round(
@@ -192,10 +199,10 @@ cat("Median annual wage by education level (full-time, 2022 dollars):\n")
 print(w2)
 cat("\nKey check — bachelor's level:\n")
 print(filter(w2, educ_cat == "bachelors") |>
-        select(educ_cat, starts_with("gap")))
+  select(educ_cat, starts_with("gap")))
 cat("Key check — postgrad level:\n")
 print(filter(w2, educ_cat == "postgrad") |>
-        select(educ_cat, starts_with("gap")))
+  select(educ_cat, starts_with("gap")))
 cat("(Parrott target: bachelor's ~33% below for-profit, ~22% below govt;\n")
 cat("                 postgrad  ~37% below for-profit, ~29% below govt)\n")
 
@@ -213,8 +220,10 @@ cat("                 postgrad  ~37% below for-profit, ~29% below govt)\n")
 
 cat("\n=== Table W3: Median Wage by Occupation × Sector (Figures 12-13) ===\n")
 
-OCC_GROUPS <- c("social_workers", "counselors", "hs_assistants",
-                "admin_support",  "janitors")
+OCC_GROUPS <- c(
+  "social_workers", "counselors", "hs_assistants",
+  "admin_support", "janitors"
+)
 
 # Build occupation-sector frame with three custom sectors:
 #   hs_nonprofit  — core HS nonprofit (is_hs & sector == "hs_nonprofit")
@@ -225,7 +234,7 @@ OCC_GROUPS <- c("social_workers", "counselors", "hs_assistants",
 # For priv_hospital there is no occ_group filter — we use the full private
 # hospital population and sub-set only when computing gaps at occupation level.
 
-occ_hs   <- acs_wages |>
+occ_hs <- acs_wages |>
   filter(is_hs_wages == TRUE, occ_group %in% OCC_GROUPS) |>
   mutate(comp_sector = "hs_nonprofit")
 
@@ -251,10 +260,10 @@ w3_by_occ <- occ_frame |>
   filter(!is.na(occ_group)) |>
   group_by(occ_group, comp_sector) |>
   summarise(
-    median_wage      = wt_median(INCWAGE,      PERWT),
+    median_wage = wt_median(INCWAGE, PERWT),
     median_wage_real = wt_median(incwage_real, PERWT),
-    n_unweighted     = n(),
-    n_weighted       = round(sum(PERWT)),
+    n_unweighted = n(),
+    n_weighted = round(sum(PERWT)),
     .groups = "drop"
   )
 
@@ -262,7 +271,7 @@ w3_by_occ <- occ_frame |>
 w3_hosp_overall <- occ_frame |>
   filter(comp_sector == "priv_hospital") |>
   summarise(
-    median_wage      = wt_median(INCWAGE,      PERWT),
+    median_wage      = wt_median(INCWAGE, PERWT),
     median_wage_real = wt_median(incwage_real, PERWT),
     n_unweighted     = n(),
     n_weighted       = round(sum(PERWT))
@@ -273,13 +282,13 @@ w3_hosp_overall <- occ_frame |>
 w3_wide <- w3_by_occ |>
   select(occ_group, comp_sector, median_wage) |>
   pivot_wider(
-    names_from  = comp_sector,
+    names_from = comp_sector,
     values_from = median_wage,
     names_prefix = "median_"
   ) |>
   mutate(
-    gap_vs_govt_pct      = round(
-      (median_govt         - median_hs_nonprofit) / median_govt         * 100, 1
+    gap_vs_govt_pct = round(
+      (median_govt - median_hs_nonprofit) / median_govt * 100, 1
     ),
     gap_vs_priv_hosp_pct = round(
       (median_priv_hospital - median_hs_nonprofit) / median_priv_hospital * 100, 1
@@ -296,14 +305,14 @@ w3_n <- w3_by_occ |>
 w3_wide_real <- w3_by_occ |>
   select(occ_group, comp_sector, median_wage_real) |>
   pivot_wider(
-    names_from  = comp_sector,
+    names_from = comp_sector,
     values_from = median_wage_real,
     names_prefix = "median_real_"
   ) |>
   mutate(
-    gap_vs_govt_pct_real      = round(
-      (median_real_govt          - median_real_hs_nonprofit) /
-        median_real_govt          * 100, 1
+    gap_vs_govt_pct_real = round(
+      (median_real_govt - median_real_hs_nonprofit) /
+        median_real_govt * 100, 1
     ),
     gap_vs_priv_hosp_pct_real = round(
       (median_real_priv_hospital - median_real_hs_nonprofit) /
@@ -335,27 +344,27 @@ cat("\ngap_vs_govt_pct / gap_vs_priv_hosp_pct: positive = comparison earns more\
 
 cat("\n=== Table W4: Median Wage by Occupation × Education × Sector (Figure 14) ===\n")
 
-OCC_PROF  <- c("social_workers", "counselors")
+OCC_PROF <- c("social_workers", "counselors")
 EDUC_HIGH <- c("bachelors", "postgrad")
-SEC_2     <- c("hs_nonprofit", "govt")
+SEC_2 <- c("hs_nonprofit", "govt")
 
 w4_long <- acs_wages |>
   filter(
     occ_group %in% OCC_PROF,
-    educ_cat  %in% EDUC_HIGH,
+    educ_cat %in% EDUC_HIGH,
     analysis_sector_wages %in% SEC_2
   ) |>
   mutate(
-    occ_group = factor(occ_group,        levels = OCC_PROF),
+    occ_group = factor(occ_group, levels = OCC_PROF),
     educ_cat  = factor(as.character(educ_cat), levels = EDUC_HIGH),
     sector    = factor(as.character(analysis_sector_wages), levels = SEC_2)
   ) |>
   group_by(occ_group, educ_cat, sector) |>
   summarise(
-    median_wage      = wt_median(INCWAGE,      PERWT),
+    median_wage = wt_median(INCWAGE, PERWT),
     median_wage_real = wt_median(incwage_real, PERWT),
-    n_unweighted     = n(),
-    n_weighted       = round(sum(PERWT)),
+    n_unweighted = n(),
+    n_weighted = round(sum(PERWT)),
     .groups = "drop"
   ) |>
   mutate(low_n_flag = n_unweighted < 100)
@@ -379,7 +388,7 @@ cat("2x2x2 cross-tab: occupation × education × sector (full-time, 2022 dollars
 print(w4_wide)
 cat("\nCells flagged low_n_flag_* == TRUE have unweighted n < 100.\n")
 
-w4 <- w4_wide   # store for output list
+w4 <- w4_wide # store for output list
 
 # =============================================================================
 # Table W5: Racial pay gaps within occupation × education × sector
@@ -400,7 +409,7 @@ cat("\n=== Table W5: Racial Pay Gaps (Figure 15) ===\n")
 w5_long <- acs_wages |>
   filter(
     occ_group %in% OCC_PROF,
-    educ_cat  %in% EDUC_HIGH,
+    educ_cat %in% EDUC_HIGH,
     analysis_sector_wages %in% SEC_2
   ) |>
   mutate(
@@ -410,10 +419,10 @@ w5_long <- acs_wages |>
   ) |>
   group_by(sector, educ_cat, race_grp) |>
   summarise(
-    median_wage      = wt_median(INCWAGE,      PERWT),
+    median_wage = wt_median(INCWAGE, PERWT),
     median_wage_real = wt_median(incwage_real, PERWT),
-    n_unweighted     = n(),
-    n_weighted       = round(sum(PERWT)),
+    n_unweighted = n(),
+    n_weighted = round(sum(PERWT)),
     .groups = "drop"
   )
 
@@ -433,7 +442,7 @@ w5_wide <- w5_long |>
     # Absolute gap
     racial_gap_abs = round(median_wage_white_nh - median_wage_poc, 0),
     low_n_white_flag = n_unweighted_white_nh < 100,
-    low_n_poc_flag   = n_unweighted_poc       < 100
+    low_n_poc_flag = n_unweighted_poc < 100
   ) |>
   arrange(sector, educ_cat)
 
@@ -441,7 +450,7 @@ cat("Racial pay gap within social workers + counselors, by education and sector:
 cat("(positive racial_gap_pct = workers of color earn less than white workers)\n\n")
 print(w5_wide)
 
-w5 <- w5_wide   # store for output list
+w5 <- w5_wide # store for output list
 
 # =============================================================================
 # Save all tables to RDS
@@ -450,13 +459,13 @@ w5 <- w5_wide   # store for output list
 wage_tables <- list(
   W1_overall_by_sector        = w1,
   W2_by_educ_sector           = w2,
-  W2_long                     = w2_long,   # long form for plotting
+  W2_long                     = w2_long, # long form for plotting
   W3_by_occ_sector            = w3,
   W3_hosp_overall             = w3_hosp_overall,
   W4_occ_educ_sector          = w4,
-  W4_long                     = w4_long,   # long form (with low_n flag)
+  W4_long                     = w4_long, # long form (with low_n flag)
   W5_racial_gaps              = w5,
-  W5_long                     = w5_long    # long form for plotting
+  W5_long                     = w5_long # long form for plotting
 )
 
 out_path <- file.path(PROC_DIR, "wage_tables.rds")
@@ -492,8 +501,10 @@ w2 |>
 cat("\nW5 — Racial gap within hs_nonprofit (social workers + counselors):\n")
 w5 |>
   filter(sector == "hs_nonprofit") |>
-  select(sector, educ_cat, median_wage_white_nh, median_wage_poc,
-         racial_gap_pct, racial_gap_abs) |>
+  select(
+    sector, educ_cat, median_wage_white_nh, median_wage_poc,
+    racial_gap_pct, racial_gap_abs
+  ) |>
   print()
 
 cat("\nDone.\n")

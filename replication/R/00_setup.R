@@ -1,113 +1,63 @@
 # 00_setup.R
 # Package loading, constants, and path definitions for the replication.
-# Source this at the top of every other script: source(here::here("replication/R/00_setup.R"))
+# Source this at start of each script: source(here::here("replication/R/00_setup.R"))
 
 library(here)
 library(tidyverse)
 library(ipumsr)
-library(srvyr)      # tidyverse-style survey-weighted statistics
-library(survey)     # underlying survey design objects
-library(scales)     # number formatting for figures
-library(ggtext)     # rich-text annotations in ggplot
+library(srvyr)
+library(survey)
+library(scales)
+library(ggtext)
 library(readxl)
+library(labelled)
 
 # ── Paths ────────────────────────────────────────────────────────────────────
 
-PROJ_ROOT   <- here::here()
-REPLIC_DIR  <- file.path(PROJ_ROOT, "replication")
-RAW_DIR     <- file.path(REPLIC_DIR, "data", "raw")
-PROC_DIR    <- file.path(REPLIC_DIR, "data", "processed")
-FIG_DIR     <- file.path(REPLIC_DIR, "output", "figures")
+PROJ_ROOT <- here::here()
+REPLIC_DIR <- file.path(PROJ_ROOT, "replication")
+RAW_DIR <- file.path(REPLIC_DIR, "data", "raw")
+PROC_DIR <- file.path(REPLIC_DIR, "data", "processed")
+FIG_DIR <- file.path(REPLIC_DIR, "output", "figures")
 
-IPUMS_DDI   <- file.path(RAW_DIR, "ipums", "usa_00003.xml")
-IPUMS_DAT   <- file.path(RAW_DIR, "ipums", "usa_00003.dat.gz")
-
-# ── ACS sample years ─────────────────────────────────────────────────────────
-
-# The extract contains two 5-year samples: 2018-2022 and 2019-2023.
-# For the replication we use only the 2018-2022 sample (YEAR 2022).
-CENSUS_YEAR <- 2022
-
-# ── NYC county FIPS codes ────────────────────────────────────────────────────
-
-NYC_COUNTIES <- c(5, 47, 61, 81, 85)   # Bronx, Kings, New York, Queens, Richmond
-
-# ── CLASSWKRD codes ──────────────────────────────────────────────────────────
-# 22 = Wage/salary, private for-profit
-# 23 = Wage/salary at non-profit
-# 24 = Wage/salary, government (general; rarely appears in ACS)
-# 25 = Federal government employee
-# 27 = State government employee
-# 28 = Local government employee
-
-CLASSWKRD_NONPROFIT  <- 23L
-CLASSWKRD_FORPROFIT  <- 22L
-CLASSWKRD_LOCAL_GOVT <- c(28L)
-CLASSWKRD_OTHER_GOVT <- c(24,25,27)
-
-# ── INDNAICS codes ───────────────────────────────────────────────────────────
-# INDNAICS is an alphanumeric string in this extract.
-#
-# Core human services industry definition (Parrott 2025):
-#   NAICS 624 — Social Assistance (6241, 6242, 6243, plus merged codes)
-#   NAICS 623 — Residential Care Facilities (6231, 623M)
-#   EXCLUDE:  6244 — Child Day Care Services
-#
-# The 623 codes capture group homes, residential mental health/substance abuse
-# facilities, supportive housing, and I/DD residences — all major components
-# of NYC human services contracting (DOHMH, DHS, HRA program areas).
-#
-# This broader definition yields ~61k weighted nonprofit workers, matching the
-# report's Figure 5 total of 60,095. The original ^624-only definition yielded
-# only ~48k, which was too narrow.
-
-INDNAICS_HS_INDUSTRY  <- "^62[34]" # regex: Social Assistance + Residential Care
-INDNAICS_CHILD_CARE   <- "6244"    # exact: child day care -- EXCLUDE
-INDNAICS_PRIV_HOSP    <- "621M"    # ACS PUMS merged hospital code (covers NAICS 6221)
+IPUMS_DDI <- file.path(RAW_DIR, "ipums", "usa_00003.xml")
+IPUMS_DAT <- file.path(RAW_DIR, "ipums", "usa_00003.dat.gz")
 
 # ── OCC codes (2018 Census occupation codes) ─────────────────────────────────
 # Source: 2018 Census Occupation Code List (Census Bureau)
 
 # Core human services professional occupations (KEEP)
 OCC_COUNSELORS <- c(
-  2001L,  # Substance abuse and behavioral disorder counselors
-  2002L,  # Educational, guidance, and career counselors and advisors
-  2003L,  # Marriage and family therapists
-  2004L,  # Mental health counselors
-  2005L,  # Rehabilitation counselors
-  2006L   # Counselors, all other
+  2001L, # Substance abuse and behavioral disorder counselors
+  2002L, # Educational, guidance, and career counselors and advisors
+  2003L, # Marriage and family therapists
+  2004L, # Mental health counselors
+  2005L, # Rehabilitation counselors
+  2006L # Counselors, all other
 )
 
 OCC_SOCIAL_WORKERS <- c(
-  2011L,  # Child, family, and school social workers
-  2012L,  # Healthcare social workers
-  2013L,  # Mental health and substance abuse social workers
-  2014L   # Social workers, all other
+  2011L, # Child, family, and school social workers
+  2012L, # Healthcare social workers
+  2013L, # Mental health and substance abuse social workers
+  2014L # Social workers, all other
 )
 
 OCC_HS_ASSISTANTS <- c(
-  2016L,  # Social and human service assistants
-  2025L   # Other community and social service specialists
+  2016L, # Social and human service assistants
+  2025L # Other community and social service specialists
 )
 
 OCC_MANAGERS <- c(
-  420L    # Social and community service managers (= Census code 0420)
+  420L # Social and community service managers (= Census code 0420)
 )
 
 # Non-professional reference occupations (used in Figures 12-13 as benchmarks)
-OCC_ADMIN_SUPPORT <- c(5740L, 5860L, 5940L)  # secretaries, office clerks, admin support
-OCC_JANITORS      <- c(4220L)                  # janitors and building cleaners
+OCC_ADMIN_SUPPORT <- c(5740L, 5860L, 5940L) # secretaries, office clerks, admin support
+OCC_JANITORS <- c(4220L) # janitors and building cleaners
 # Security guards: look up separately -- likely ~3600 range or 3930
 
-# Occupations to EXCLUDE from Social Assistance (home health / personal care)
-# Per Parrott: "all home care and personal care aide occupational employment
-# is excluded even when those workers appear in the individual and family
-# services industry"
-OCC_EXCLUDE_HOMECARE <- c(
-  3601L,  # Home health aides
-  3602L,  # Personal care aides
-  3603L   # Nursing assistants
-)
+
 
 # EDUC codes (general version)
 # 00 = N/A or no schooling
@@ -131,9 +81,9 @@ INCWAGE_TOPCODE <- 999999L
 theme_parrott <- function() {
   theme_minimal(base_size = 11) +
     theme(
-      plot.title    = element_markdown(face = "bold"),
+      plot.title = element_markdown(face = "bold"),
       plot.subtitle = element_text(color = "grey40"),
       panel.grid.minor = element_blank(),
-      legend.position  = "bottom"
+      legend.position = "bottom"
     )
 }

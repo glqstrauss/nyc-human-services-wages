@@ -1,0 +1,5 @@
+- Size of core social assistance sector over time, non-profits vs govt
+- Union density of sector over time (CPS)
+- Size of govt social services agencies over time (not just service provision functions, also admin, fiscal etc)
+- Size and number of contracts over time, and average contract value
+- Non-profit exec pay over time (if 990s are available historically)

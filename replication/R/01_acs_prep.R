@@ -21,34 +21,46 @@ message(paste("Loaded", format(nrow(raw), big.mark = ","), "rows total."))
 d <- raw |>
   filter(
     STATEFIP == 36L, # New York State
-    COUNTYFIP %in% NYC_COUNTIES, # five NYC boroughs
-    YEAR == CENSUS_YEAR, # 2022 census only (not 2023)
+    COUNTYFIP %in% c(5, 47, 61, 81, 85), # Bronx, Kings, New York, Queens, Richmond
+    YEAR == 2022, # Data extract includes multiple surveys.
     EMPSTAT == 1L, # employed last week
     GQ %in% 1:2 # exclude group quarters (prisons, dorms)
   )
 
-message(paste("After NYC/year/employed filters:", format(nrow(d), big.mark = ","), "rows."))
+message(
+  paste("After NYC/year/employed filters:", format(nrow(d), big.mark = ","), "rows.")
+)
 
 # ── 3. Sector variable ────────────────────────────────────────────────────────
 # Based on CLASSWKRD (detailed class of worker)
+# https://usa.ipums.org/usa-action/variables/CLASSWKR#codes_section
 
 d <- d |>
   mutate(
     sector = case_when(
-      CLASSWKRD == CLASSWKRD_NONPROFIT ~ "hs_nonprofit", # renamed below
-      CLASSWKRD == CLASSWKRD_FORPROFIT ~ "priv_forprofit",
-      CLASSWKRD == CLASSWKRD_LOCAL_GOVT ~ "local_govt",
-      CLASSWKRD %in% CLASSWKRD_OTHER_GOVT ~ "other_govt", 
       CLASSWKRD %in% c(13L, 14L) ~ "self_employed",
-      TRUE ~ NA_character_
+      CLASSWKRD == 22L ~ "priv_forprofit",
+      CLASSWKRD == 23L ~ "priv_nonprofit",
+      CLASSWKRD %in% c(25L, 27L, 28L) ~ "govt",
+      TRUE ~ NA_character_ # Capures NA and Unpaid Family Worker
     ) |> factor()
   )
 
 # ── 4. Core human services flag ───────────────────────────────────────────────
-# Definition (Parrott 2025):
-#   - Industry: Social Assistance (NAICS 624) + Residential Care (NAICS 623),
-#     excluding Child Day Care Services (NAICS 6244)
-#   - Sector: nonprofit only (CLASSWKRD == 23)
+# INDNAICS is an alphanumeric string in this extract.
+#
+# Core human services industry definition (Parrott 2025):
+#   NAICS 624 — Social Assistance (6241, 6242, 6243, plus merged codes)
+#   NAICS 623 — Residential Care Facilities (6231, 623M)
+#   EXCLUDE:  6244 — Child Day Care Services
+#
+# The 623 codes capture group homes, residential mental health/substance abuse
+# facilities, supportive housing, and I/DD residences — all major components
+# of NYC human services contracting (DOHMH, DHS, HRA program areas).
+#
+# This broader definition yields ~61k weighted nonprofit workers, matching the
+# report's Figure 5 total of 60,095. The original ^624-only definition yielded
+# only ~48k, which was too narrow.
 #
 # `is_hs` is the primary sample flag for demographics/headcount (Figs 4-8).
 # It does NOT exclude homecare occupations, matching the report's Figure 5
@@ -58,14 +70,23 @@ d <- d |>
 # nursing assistants. Used for wage analysis (Figs 10-15) because "including
 # [homecare workers] would have skewed the wage distribution downward"
 # (Parrott 2025, p. 9).
+# Occupations to EXCLUDE from Social Assistance (home health / personal care)
+# Per Parrott: "all home care and personal care aide occupational employment
+# is excluded even when those workers appear in the individual and family
+# services industry"
 
 d <- d |>
   mutate(
-    in_hs_industry = grepl(INDNAICS_HS_INDUSTRY, INDNAICS) &
-      INDNAICS != INDNAICS_CHILD_CARE,
-    homecare_occ = OCC %in% OCC_EXCLUDE_HOMECARE,
+    # Social Assistance (624*) + Residential Care (623*)  - Childcare (6244)
+    in_hs_industry = grepl("^62[34]", INDNAICS) &
+      INDNAICS != 6244,
+    homecare_occ = OCC %in% c(
+      3601L, # Home health aides
+      3602L, # Personal care aides
+      3603L # Nursing assistants
+    ),
     is_hs = in_hs_industry &
-      !is.na(sector) & sector == "hs_nonprofit",
+      !is.na(sector) & sector == "priv_nonprofit",
     is_hs_wages = is_hs & !homecare_occ
   )
 
@@ -76,22 +97,15 @@ message(paste(
 ))
 message(paste(
   "  Wage-eligible (is_hs_wages, excl. homecare):",
-  format(sum(d$is_hs_wages), big.mark = ","), "unweighted."
+  format(sum(d$is_hs_wages), big.mark = ","), "unweighted.",
+  format(round(sum(d$PERWT[d$is_hs_wages])), big.mark = ","), "weighted."
 ))
 
-# Rename sector label for hs_nonprofit to be explicit
-# (all nonprofit workers, not just HS; is_hs flag identifies HS nonprofits)
-# sector == "hs_nonprofit" actually means "private nonprofit (any industry)"
-# We'll use is_hs as the primary HS group; rename sector level for clarity
-d <- d |>
-  mutate(
-    sector = fct_recode(sector, "priv_nonprofit" = "hs_nonprofit")
-  )
-
 # Flag private hospitals (comparison group for occupation-level tables)
+# 621M: ACS PUMS merged hospital code (covers NAICS 6221?)
 d <- d |>
   mutate(
-    priv_hosp = INDNAICS == INDNAICS_PRIV_HOSP & sector == "priv_forprofit"
+    priv_hosp = INDNAICS == "621M" & sector == "priv_forprofit"
   )
 
 # ── 5. Occupation group variable ─────────────────────────────────────────────
@@ -168,13 +182,13 @@ d <- d |>
 
 check_cells <- d |>
   filter(is_hs, full_time) |>
-  count(educ_cat, name = "n_unweighted")
+  summarize(n_unweighted = n(), n_weighted = sum(PERWT), .by = educ_cat)
 message("Core HS nonprofit full-time workers by education (unweighted):")
 print(check_cells)
 
 check_occ <- d |>
   filter(is_hs, full_time) |>
-  count(occ_group, name = "n_unweighted") |>
+  summarize(n_unweighted = n(), n_weighted = sum(PERWT), .by = occ_group) |>
   arrange(desc(n_unweighted))
 message("Core HS nonprofit full-time workers by occupation group (unweighted):")
 print(check_occ)
@@ -193,20 +207,20 @@ d <- d |>
   mutate(
     analysis_sector = case_when(
       is_hs ~ "hs_nonprofit",
-      sector %in% c("local_govt", "other_govt") ~ "govt",
+      sector == "govt" ~ "govt",
       sector == "priv_forprofit" ~ "priv_forprofit",
       TRUE ~ NA_character_
     ) |> factor(levels = c("hs_nonprofit", "govt", "priv_forprofit")),
     analysis_sector_wages = case_when(
       is_hs_wages ~ "hs_nonprofit",
-      sector %in% c("local_govt", "other_govt") ~ "govt",
+      sector == "govt" ~ "govt",
       sector == "priv_forprofit" ~ "priv_forprofit",
       TRUE ~ NA_character_
     ) |> factor(levels = c("hs_nonprofit", "govt", "priv_forprofit"))
   )
 
 message("analysis_sector distribution:")
-print(table(d$analysis_sector, useNA = "always"))
+print(summarize(d, n_unweighted = n(), n_weighted = sum(PERWT), .by = analysis_sector))
 
 # ── 12. Save ──────────────────────────────────────────────────────────────────
 

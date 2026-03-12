@@ -1,5 +1,7 @@
 linters: linters_with_defaults(
     object_name_linter = object_name_linter(regexes = c("^[a-z][a-z0-9_]*$", "^[A-Z][A-Z0-9_]*$")),
-    line_length_linter = line_length_linter(length = 88)
+    line_length_linter = line_length_linter(length = 88),
+    object_usage_linter = NULL,
+    indentation_linter = indentation_linter(indent = 4L)
   )
 encoding: "UTF-8"
