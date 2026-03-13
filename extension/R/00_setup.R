@@ -11,18 +11,28 @@ library(scales)
 library(ggtext)
 library(readxl)
 library(labelled)
+library(matrixStats)
+
+# ── Plot constants ───────────────────────────────────────────────────────────
+
+role_colors <- c(base = "#1b9e77", comparison = "#d95f02", reference = "#7570b3")
 
 # ── Paths ────────────────────────────────────────────────────────────────────
 
-PROJ_ROOT  <- here::here()
+PROJ_ROOT <- here::here()
 REPLIC_DIR <- file.path(PROJ_ROOT, "replication")
-EXT_DIR    <- file.path(PROJ_ROOT, "extension")
+EXT_DIR <- file.path(PROJ_ROOT, "extension")
 
 # Replication outputs (read-only)
 REPLIC_PROC_DIR <- file.path(REPLIC_DIR, "data", "processed")
-REPLIC_FIG_DIR  <- file.path(REPLIC_DIR, "output", "figures")
+REPLIC_FIG_DIR <- file.path(REPLIC_DIR, "output", "figures")
 
 # Extension data
-EXT_RAW_DIR  <- file.path(EXT_DIR, "data", "raw")
+EXT_RAW_DIR <- file.path(EXT_DIR, "data", "raw")
 EXT_PROC_DIR <- file.path(EXT_DIR, "data", "processed")
-EXT_FIG_DIR  <- file.path(EXT_DIR, "output", "figures")
+EXT_FIG_DIR <- file.path(EXT_DIR, "output", "figures")
+
+# ----- Because the VSCode R Extension doesn't like haven labels...
+
+safe_view <- \(df) View(haven::zap_labels(df))
+vw <- safe_view

@@ -9,9 +9,9 @@ source(here::here("replication/R/00_setup.R"))
 
 # ── Load tables ───────────────────────────────────────────────────────────────
 
-demo  <- readRDS(file.path(PROC_DIR, "demographics_tables.rds"))
+demo <- readRDS(file.path(PROC_DIR, "demographics_tables.rds"))
 wages <- readRDS(file.path(PROC_DIR, "wage_tables.rds"))
-hard  <- readRDS(file.path(PROC_DIR, "hardship_tables.rds"))
+hard <- readRDS(file.path(PROC_DIR, "hardship_tables.rds"))
 
 # ── Shared helpers ────────────────────────────────────────────────────────────
 
@@ -60,14 +60,15 @@ fig4_data <- demo$tbl1_gender_share |>
 fig4 <- ggplot(fig4_data, aes(x = group_label, y = share_pct, fill = group_label)) +
   geom_col(width = 0.55, show.legend = FALSE) +
   geom_text(aes(label = paste0(round(share_pct, 1), "%")),
-            vjust = -0.4, size = 4) +
+    vjust = -0.4, size = 4
+  ) +
   scale_y_continuous(limits = c(0, 85), labels = function(x) paste0(x, "%")) +
   scale_fill_manual(values = c(
     "Human Services\n(Nonprofit)" = "#1f77b4",
     "All Private\nSector"         = "#aec7e8"
   )) +
   labs(
-    title    = "Share of Full-Time Workers Who Are Women",
+    title = "Share of Full-Time Workers Who Are Women",
     subtitle = "NYC, 2018-2022 ACS five-year average",
     x = NULL, y = "Share of full-time workers"
   ) +
@@ -84,7 +85,7 @@ fig5_data <- demo$tbl2_race_share |>
   pivot_longer(-group, names_to = "race_group", values_to = "share") |>
   mutate(
     group_label = GROUP_LABELS[group],
-    race_label  = recode(race_group,
+    race_label = recode(race_group,
       share_poc      = "Workers of\nColor (total)",
       share_black    = "Black\n(non-Hispanic)",
       share_hispanic = "Hispanic/\nLatinx",
@@ -96,14 +97,15 @@ fig5_data <- demo$tbl2_race_share |>
 fig5 <- ggplot(fig5_data, aes(x = race_label, y = share_pct, fill = group_label)) +
   geom_col(position = "dodge", width = 0.7) +
   geom_text(aes(label = paste0(round(share_pct, 1), "%")),
-            position = position_dodge(0.7), vjust = -0.4, size = 3) +
+    position = position_dodge(0.7), vjust = -0.4, size = 3
+  ) +
   scale_y_continuous(limits = c(0, 95), labels = function(x) paste0(x, "%")) +
   scale_fill_manual(values = c(
     "Human Services\n(Nonprofit)" = "#1f77b4",
     "All Private\nSector"         = "#aec7e8"
   ), name = NULL) +
   labs(
-    title    = "Race/Ethnicity Composition of Full-Time Workers",
+    title = "Race/Ethnicity Composition of Full-Time Workers",
     subtitle = "NYC, 2018-2022 ACS five-year average",
     x = NULL, y = "Share of full-time workers"
   ) +
@@ -117,7 +119,7 @@ save_fig(fig5, "fig05_race_share")
 
 fig6_data <- demo$tbl3_gender_race_share |>
   mutate(
-    group_label    = GROUP_LABELS[group],
+    group_label = GROUP_LABELS[group],
     gender_race_lbl = recode(gender_race,
       white_men      = "White Men",
       white_women    = "White Women",
@@ -130,14 +132,15 @@ fig6_data <- demo$tbl3_gender_race_share |>
 fig6 <- ggplot(fig6_data, aes(x = gender_race_lbl, y = share_pct, fill = group_label)) +
   geom_col(position = "dodge", width = 0.7) +
   geom_text(aes(label = paste0(round(share_pct, 1), "%")),
-            position = position_dodge(0.7), vjust = -0.4, size = 3) +
+    position = position_dodge(0.7), vjust = -0.4, size = 3
+  ) +
   scale_y_continuous(limits = c(0, 60), labels = function(x) paste0(x, "%")) +
   scale_fill_manual(values = c(
     "Human Services\n(Nonprofit)" = "#1f77b4",
     "All Private\nSector"         = "#aec7e8"
   ), name = NULL) +
   labs(
-    title    = "Gender and Race Composition of Full-Time Workers",
+    title = "Gender and Race Composition of Full-Time Workers",
     subtitle = "NYC, 2018-2022 ACS five-year average",
     x = NULL, y = "Share of full-time workers"
   ) +
@@ -153,19 +156,21 @@ fig7_data <- demo$tbl4_educ_share |>
   mutate(
     group_label = case_when(
       group == "hs_nonprofit" ~ "Human Services\n(Nonprofit)",
-      group == "govt"         ~ "Public Sector",
-      group == "all_private"  ~ "All Private\nSector",
-      TRUE                    ~ group
+      group == "govt" ~ "Public Sector",
+      group == "all_private" ~ "All Private\nSector",
+      TRUE ~ group
     ),
     educ_label = factor(EDUC_LABELS[as.character(educ_cat)],
-                        levels = unname(EDUC_LABELS)),
-    share_pct  = share * 100
+      levels = unname(EDUC_LABELS)
+    ),
+    share_pct = share * 100
   )
 
 fig7 <- ggplot(fig7_data, aes(x = educ_label, y = share_pct, fill = group_label)) +
   geom_col(position = "dodge", width = 0.75) +
   geom_text(aes(label = paste0(round(share_pct, 1), "%")),
-            position = position_dodge(0.75), vjust = -0.4, size = 2.8) +
+    position = position_dodge(0.75), vjust = -0.4, size = 2.8
+  ) +
   scale_y_continuous(limits = c(0, 42), labels = function(x) paste0(x, "%")) +
   scale_fill_manual(values = c(
     "Human Services\n(Nonprofit)" = "#1f77b4",
@@ -173,7 +178,7 @@ fig7 <- ggplot(fig7_data, aes(x = educ_label, y = share_pct, fill = group_label)
     "All Private\nSector"         = "#aec7e8"
   ), name = NULL) +
   labs(
-    title    = "Education Level of Full-Time Workers",
+    title = "Education Level of Full-Time Workers",
     subtitle = "NYC, 2018-2022 ACS five-year average",
     x = NULL, y = "Share of full-time workers"
   ) +
@@ -189,22 +194,29 @@ fig10_data <- wages$W2_long |>
   filter(sector %in% names(SECTOR_LABELS)) |>
   mutate(
     sector_label = factor(SECTOR_LABELS[as.character(sector)],
-                          levels = unname(SECTOR_LABELS)),
-    educ_label   = factor(EDUC_LABELS[as.character(educ_cat)],
-                          levels = unname(EDUC_LABELS))
+      levels = unname(SECTOR_LABELS)
+    ),
+    educ_label = factor(EDUC_LABELS[as.character(educ_cat)],
+      levels = unname(EDUC_LABELS)
+    )
   ) |>
   filter(!is.na(educ_label))
 
-fig10 <- ggplot(fig10_data,
-                aes(x = educ_label, y = median_wage, fill = sector_label)) +
+fig10 <- ggplot(
+  fig10_data,
+  aes(x = educ_label, y = median_wage, fill = sector_label)
+) +
   geom_col(position = "dodge", width = 0.75) +
   geom_text(aes(label = paste0("$", round(median_wage / 1000, 0), "k")),
-            position = position_dodge(0.75), vjust = -0.4, size = 2.8) +
-  scale_y_continuous(labels = function(x) paste0("$", x/1000, "k"),
-                     limits = c(0, 135000)) +
+    position = position_dodge(0.75), vjust = -0.4, size = 2.8
+  ) +
+  scale_y_continuous(
+    labels = function(x) paste0("$", x / 1000, "k"),
+    limits = c(0, 135000)
+  ) +
   scale_fill_manual(values = unname(SECTOR_COLORS), name = NULL) +
   labs(
-    title    = "Median Annual Pay by Education Level and Sector",
+    title = "Median Annual Pay by Education Level and Sector",
     subtitle = "Full-time workers, NYC, 2018-2022 ACS (pooled dollars)",
     x = NULL, y = "Median annual wage"
   ) +
@@ -239,13 +251,18 @@ fig12_data <- wages$W3_by_occ_sector |>
   ) |>
   filter(!is.na(median_wage), !is.na(occ_label))
 
-fig12 <- ggplot(fig12_data,
-                aes(x = occ_label, y = median_wage, fill = comp_label)) +
+fig12 <- ggplot(
+  fig12_data,
+  aes(x = occ_label, y = median_wage, fill = comp_label)
+) +
   geom_col(position = "dodge", width = 0.75) +
   geom_text(aes(label = paste0("$", round(median_wage / 1000, 0), "k")),
-            position = position_dodge(0.75), vjust = -0.4, size = 2.8) +
-  scale_y_continuous(labels = function(x) paste0("$", x/1000, "k"),
-                     limits = c(0, 100000)) +
+    position = position_dodge(0.75), vjust = -0.4, size = 2.8
+  ) +
+  scale_y_continuous(
+    labels = function(x) paste0("$", x / 1000, "k"),
+    limits = c(0, 100000)
+  ) +
   scale_fill_manual(
     values = c(
       "Human Services\n(Nonprofit)" = "#1f77b4",
@@ -255,7 +272,7 @@ fig12 <- ggplot(fig12_data,
     name = NULL
   ) +
   labs(
-    title    = "Median Annual Pay by Occupation and Sector",
+    title = "Median Annual Pay by Occupation and Sector",
     subtitle = "Full-time workers, NYC, 2018-2022 ACS (pooled dollars)",
     x = NULL, y = "Median annual wage"
   ) +
@@ -270,11 +287,11 @@ save_fig(fig12, "fig12_wage_by_occ_sector", width = 10, height = 5)
 
 fig14_data <- wages$W4_long |>
   mutate(
-    occ_label    = recode(as.character(occ_group),
+    occ_label = recode(as.character(occ_group),
       social_workers = "Social Workers",
       counselors     = "Counselors"
     ),
-    educ_label   = recode(as.character(educ_cat),
+    educ_label = recode(as.character(educ_cat),
       bachelors = "Bachelor's",
       postgrad  = "Master's+"
     ),
@@ -285,13 +302,18 @@ fig14_data <- wages$W4_long |>
     panel_x = paste(educ_label, occ_label, sep = "\n")
   )
 
-fig14 <- ggplot(fig14_data,
-                aes(x = panel_x, y = median_wage, fill = sector_label)) +
+fig14 <- ggplot(
+  fig14_data,
+  aes(x = panel_x, y = median_wage, fill = sector_label)
+) +
   geom_col(position = "dodge", width = 0.7) +
   geom_text(aes(label = paste0("$", round(median_wage / 1000, 0), "k")),
-            position = position_dodge(0.7), vjust = -0.4, size = 2.8) +
-  scale_y_continuous(labels = function(x) paste0("$", x/1000, "k"),
-                     limits = c(0, 105000)) +
+    position = position_dodge(0.7), vjust = -0.4, size = 2.8
+  ) +
+  scale_y_continuous(
+    labels = function(x) paste0("$", x / 1000, "k"),
+    limits = c(0, 105000)
+  ) +
   scale_fill_manual(
     values = c(
       "Human Services\n(Nonprofit)" = "#1f77b4",
@@ -300,7 +322,7 @@ fig14 <- ggplot(fig14_data,
     name = NULL
   ) +
   labs(
-    title    = "Median Pay by Occupation, Education, and Sector",
+    title = "Median Pay by Occupation, Education, and Sector",
     subtitle = "Full-time workers, NYC, 2018-2022 ACS (pooled dollars)",
     x = NULL, y = "Median annual wage"
   ) +
@@ -316,31 +338,38 @@ save_fig(fig14, "fig14_wage_occ_educ_sector", width = 10, height = 5)
 fig15_data <- wages$W5_long |>
   filter(!is.na(median_wage)) |>
   mutate(
-    educ_label   = recode(as.character(educ_cat),
-      bachelors = "Bachelor's", postgrad = "Master's+"),
+    educ_label = recode(as.character(educ_cat),
+      bachelors = "Bachelor's", postgrad = "Master's+"
+    ),
     sector_label = recode(as.character(sector),
       hs_nonprofit = "Human Services\n(Nonprofit)",
-      govt         = "Public Sector"),
-    race_label   = recode(race_grp,
+      govt         = "Public Sector"
+    ),
+    race_label = recode(race_grp,
       white_nh = "White (non-Hispanic)",
       poc      = "Workers of Color"
     ),
     panel_x = interaction(educ_label, sector_label, sep = "\n")
   )
 
-fig15 <- ggplot(fig15_data,
-                aes(x = panel_x, y = median_wage, fill = race_label)) +
+fig15 <- ggplot(
+  fig15_data,
+  aes(x = panel_x, y = median_wage, fill = race_label)
+) +
   geom_col(position = "dodge", width = 0.7) +
   geom_text(aes(label = paste0("$", round(median_wage / 1000, 0), "k")),
-            position = position_dodge(0.7), vjust = -0.4, size = 2.8) +
-  scale_y_continuous(labels = function(x) paste0("$", x/1000, "k"),
-                     limits = c(0, 108000)) +
+    position = position_dodge(0.7), vjust = -0.4, size = 2.8
+  ) +
+  scale_y_continuous(
+    labels = function(x) paste0("$", x / 1000, "k"),
+    limits = c(0, 108000)
+  ) +
   scale_fill_manual(
     values = c("White (non-Hispanic)" = "#2ca02c", "Workers of Color" = "#98df8a"),
     name = NULL
   ) +
   labs(
-    title    = "Racial Pay Gaps: Social Workers and Counselors",
+    title = "Racial Pay Gaps: Social Workers and Counselors",
     subtitle = "By education level and sector, full-time workers, NYC, 2018-2022 ACS",
     x = NULL, y = "Median annual wage"
   ) +
@@ -362,13 +391,17 @@ snap_data <- hard$H1_snap_by_sector |>
     )
   )
 
-fig_snap <- ggplot(snap_data, aes(x = sector_label, y = snap_rate_pct,
-                                  fill = sector_label)) +
+fig_snap <- ggplot(snap_data, aes(
+  x = sector_label, y = snap_rate_pct,
+  fill = sector_label
+)) +
   geom_col(width = 0.55, show.legend = FALSE) +
   geom_errorbar(aes(ymin = snap_rate_low * 100, ymax = snap_rate_upp * 100),
-                width = 0.2) +
+    width = 0.2
+  ) +
   geom_text(aes(label = paste0(snap_rate_pct, "%")),
-            vjust = -1.0, size = 4) +
+    vjust = -1.0, size = 4
+  ) +
   scale_y_continuous(limits = c(0, 22), labels = function(x) paste0(x, "%")) +
   scale_fill_manual(values = c(
     "Human Services\n(Nonprofit)" = "#1f77b4",
@@ -376,7 +409,7 @@ fig_snap <- ggplot(snap_data, aes(x = sector_label, y = snap_rate_pct,
     "Private For-Profit"          = "#2ca02c"
   )) +
   labs(
-    title    = "Share of Workers Receiving SNAP (Food Stamps)",
+    title = "Share of Workers Receiving SNAP (Food Stamps)",
     subtitle = "All workers, NYC, 2018-2022 ACS five-year average",
     x = NULL, y = "Share receiving SNAP"
   ) +

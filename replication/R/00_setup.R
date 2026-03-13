@@ -20,8 +20,10 @@ RAW_DIR <- file.path(REPLIC_DIR, "data", "raw")
 PROC_DIR <- file.path(REPLIC_DIR, "data", "processed")
 FIG_DIR <- file.path(REPLIC_DIR, "output", "figures")
 
-IPUMS_DDI <- file.path(RAW_DIR, "ipums", "usa_00003.xml")
-IPUMS_DAT <- file.path(RAW_DIR, "ipums", "usa_00003.dat.gz")
+IPUMS_DDI <- file.path(RAW_DIR, "ipums", "usa_00004.xml")
+IPUMS_DAT <- file.path(RAW_DIR, "ipums", "usa_00004.dat.gz")
+
+INDNAICS_XWALK <- file.path(RAW_DIR, "ipums", "indnaics_crosswalk_2000_onward_with_code_descriptions.csv")
 
 # ── OCC codes (2018 Census occupation codes) ─────────────────────────────────
 # Source: 2018 Census Occupation Code List (Census Bureau)

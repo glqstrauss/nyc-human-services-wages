@@ -1,0 +1,10 @@
+{
+  "[r]": {
+    "editor.defaultFormatter": "REditorSupport.r",
+    "editor.formatOnSave": true,
+    "editor.tabSize": 2,  // nb: this controls editor indent only, not respected by the autoformatter
+  },
+  "files.associations": {
+    "*.R": "r"
+  }
+}

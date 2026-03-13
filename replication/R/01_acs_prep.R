@@ -6,6 +6,24 @@
 
 source(here::here("replication/R/00_setup.R"))
 
+# ── 0. INDNAICS crosswalk ─────────────────────────────────────────────────────
+# Loads the IPUMS-provided crosswalk CSV, which covers all Census/ACS-specific
+# merged codes (M, P, S, Z suffixes) not found in official NAICS documentation.
+# Source: https://usa.ipums.org/usa/volii/indnaics.shtml
+
+indnaics_xwalk <- read_csv(
+  INDNAICS_XWALK,
+  col_types = cols(.default = "c"),
+  show_col_types = FALSE
+) |>
+  select(-1) |> # drop unnamed row-index column
+  rename(
+    indnaics = `2018-2022 ACS/PRCS INDNAICS CODE`,
+    industry_title = `Industry Title`
+  ) |>
+  select(indnaics, industry_title) |>
+  filter(!is.na(indnaics))
+
 # ── 1. Load IPUMS extract ─────────────────────────────────────────────────────
 
 message("Reading IPUMS DDI...")
@@ -178,7 +196,15 @@ d <- d |>
     wage_valid = INCWAGE > 0L & INCWAGE < INCWAGE_TOPCODE
   )
 
-# ── 10. Unweighted cell-size check ───────────────────────────────────────────
+# ── 10. City Worker Flag ───────────────────────────────────────────
+
+# Major TODO: Does this capture NYC H+H workers?
+
+d <- d |> mutate(
+  is_city_wkr = if_else(CLASSWKRD == 28L, TRUE, FALSE)
+)
+
+# ── 11. Unweighted cell-size check ───────────────────────────────────────────
 
 check_cells <- d |>
   filter(is_hs, full_time) |>
@@ -193,7 +219,7 @@ check_occ <- d |>
 message("Core HS nonprofit full-time workers by occupation group (unweighted):")
 print(check_occ)
 
-# ── 11. Three-way analysis sector variable ────────────────────────────────────
+# ── 12. Three-way analysis sector variable ────────────────────────────────────
 # Clean classification for all downstream demographic and wage tables:
 #   "hs_nonprofit"   = core human services nonprofit workers
 #   "govt"           = all government workers
