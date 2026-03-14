@@ -1,12 +1,12 @@
+# This file was initially exploring various defintions of both the nonprofit human services
+# workforce and the public sector comparison group, but it was also doing wage calculations
+# across those groups. What we need to do here is extract the population exploration stuff
+# into 11_population.R and have this file focus on wage comparisons once the populations
+# are defined...
+
 source(here::here("extension/R/00_setup.R"))
 
 acs <- readRDS(file.path(REPLIC_PROC_DIR, "acs_prepared.rds"))
-
-acs_wages <- acs |> filter(
-  full_time == TRUE,
-  INCWAGE < 999999,
-  INCWAGE > 0
-)
 
 ######################################
 # Questions:
@@ -21,6 +21,12 @@ acs_wages <- acs |> filter(
 # Tentatively:
 #    - For most analayses
 ##############################################
+
+acs_wages <- acs |> filter(
+  full_time == TRUE,
+  INCWAGE < 999999,
+  INCWAGE > 0
+)
 
 make_wage_by_group_and_sector_plot <- function(data, xvar, title) {
   data |>
