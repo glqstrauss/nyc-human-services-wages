@@ -14,14 +14,14 @@ d <- readRDS(file.path(PROC_DIR, "acs_prepared.rds"))
 
 # Hardship analysis uses ALL workers (full- and part-time), not just full-time,
 # to capture the full economic reality of the workforce.
-# Three-way sector comparison using analysis_sector.
+# Three-way sector comparison using parrott_analysis_sector.
 
 d_hw <- d |>
-  filter(!is.na(analysis_sector)) |>
+  filter(!is.na(parrott_analysis_sector)) |>
   mutate(
-    sector       = analysis_sector,
-    snap_receipt = FOODSTMP == 2L,              # 2 = yes, received SNAP
-    below_200pct = POVERTY < 200 & POVERTY > 0  # below 200% federal poverty line
+    sector       = parrott_analysis_sector,
+    snap_receipt = FOODSTMP == 2L, # 2 = yes, received SNAP
+    below_200pct = POVERTY < 200 & POVERTY > 0 # below 200% federal poverty line
     # Note: POVERTY == 0 means N/A (not in poverty universe); exclude.
   )
 
@@ -29,21 +29,21 @@ svy <- d_hw |>
   as_survey_design(weights = PERWT)
 
 # ── Alternative universe definitions for HS nonprofit group (additive) ────────
-# Narrow: is_hs_wages == TRUE = HS industry nonprofit, excl. homecare OCC
-# Broad1: is_hs == TRUE       = HS industry nonprofit, INCLUDE homecare OCC
-# Broad2: in_hs_industry      = All HS industry workers, any sector, any OCC
+# Narrow: parrott_hs_wages == TRUE = HS industry nonprofit, excl. homecare OCC
+# Broad1: parrott_hs == TRUE       = HS industry nonprofit, INCLUDE homecare OCC
+# Broad2: is_hs_industry      = All HS industry workers, any sector, any OCC
 #
-# Note: `in_hs_industry` and `sector` are available from acs_prepared.rds.
+# Note: `is_hs_industry` and `sector` are available from acs_prepared.rds.
 
 d_broad1 <- d |>
-  filter(is_hs) |>   # broad: includes homecare occupations
+  filter(parrott_hs) |> # broad: includes homecare occupations
   mutate(
     snap_receipt = FOODSTMP == 2L,
     below_200pct = POVERTY < 200 & POVERTY > 0
   )
 
 d_broad2 <- d |>
-  filter(in_hs_industry) |>   # all sectors, all OCC
+  filter(is_hs_industry) |> # all sectors, all OCC
   mutate(
     snap_receipt = FOODSTMP == 2L,
     below_200pct = POVERTY < 200 & POVERTY > 0
@@ -73,27 +73,39 @@ h1_b1 <- svy_broad1 |>
     snap_rate_broad1     = survey_mean(snap_receipt, na.rm = TRUE, vartype = NULL),
     n_unweighted_broad1  = unweighted(n()),
     n_weighted_broad1    = round(survey_total(1, vartype = NULL))
-  ) |> as_tibble() |>
-  mutate(snap_rate_broad1_pct = round(snap_rate_broad1 * 100, 1),
-         sector = factor("hs_nonprofit", levels = levels(h1$sector)))
+  ) |>
+  as_tibble() |>
+  mutate(
+    snap_rate_broad1_pct = round(snap_rate_broad1 * 100, 1),
+    sector = factor("hs_nonprofit", levels = levels(h1$sector))
+  )
 
 h1_b2 <- svy_broad2 |>
   summarise(
     snap_rate_broad2     = survey_mean(snap_receipt, na.rm = TRUE, vartype = NULL),
     n_unweighted_broad2  = unweighted(n()),
     n_weighted_broad2    = round(survey_total(1, vartype = NULL))
-  ) |> as_tibble() |>
-  mutate(snap_rate_broad2_pct = round(snap_rate_broad2 * 100, 1),
-         sector = factor("hs_nonprofit", levels = levels(h1$sector)))
+  ) |>
+  as_tibble() |>
+  mutate(
+    snap_rate_broad2_pct = round(snap_rate_broad2 * 100, 1),
+    sector = factor("hs_nonprofit", levels = levels(h1$sector))
+  )
 
 h1 <- h1 |>
-  left_join(h1_b1 |> select(sector, snap_rate_broad1_pct,
-                             n_unweighted_broad1, n_weighted_broad1), by = "sector") |>
-  left_join(h1_b2 |> select(sector, snap_rate_broad2_pct,
-                             n_unweighted_broad2, n_weighted_broad2), by = "sector")
+  left_join(h1_b1 |> select(
+    sector, snap_rate_broad1_pct,
+    n_unweighted_broad1, n_weighted_broad1
+  ), by = "sector") |>
+  left_join(h1_b2 |> select(
+    sector, snap_rate_broad2_pct,
+    n_unweighted_broad2, n_weighted_broad2
+  ), by = "sector")
 
-print(h1 |> select(sector, snap_rate_pct, snap_rate_broad1_pct, snap_rate_broad2_pct,
-                   n_weighted, n_weighted_broad1, n_weighted_broad2))
+print(h1 |> select(
+  sector, snap_rate_pct, snap_rate_broad1_pct, snap_rate_broad2_pct,
+  n_weighted, n_weighted_broad1, n_weighted_broad2
+))
 cat("\nParrott target: hs_nonprofit ~19%, govt ~11%, priv_forprofit ~14%\n")
 cat("broad1 = HS industry nonprofit incl. homecare OCC\n")
 cat("broad2 = All HS industry workers any sector\n")
@@ -104,7 +116,7 @@ cat("broad2 = All HS industry workers any sector\n")
 cat("\n=== Table H2: Share Below 200% Federal Poverty Line by Sector ===\n")
 
 h2 <- svy |>
-  filter(POVERTY > 0) |>   # exclude N/A poverty universe
+  filter(POVERTY > 0) |> # exclude N/A poverty universe
   group_by(sector) |>
   summarise(
     below_200pct_rate = survey_mean(below_200pct, na.rm = TRUE, vartype = "ci"),
@@ -121,9 +133,12 @@ h2_b1 <- svy_broad1 |>
     below_200pct_broad1     = survey_mean(below_200pct, na.rm = TRUE, vartype = NULL),
     n_unweighted_broad1     = unweighted(n()),
     n_weighted_broad1       = round(survey_total(1, vartype = NULL))
-  ) |> as_tibble() |>
-  mutate(below_200pct_broad1_pct = round(below_200pct_broad1 * 100, 1),
-         sector = factor("hs_nonprofit", levels = levels(h2$sector)))
+  ) |>
+  as_tibble() |>
+  mutate(
+    below_200pct_broad1_pct = round(below_200pct_broad1 * 100, 1),
+    sector = factor("hs_nonprofit", levels = levels(h2$sector))
+  )
 
 h2_b2 <- svy_broad2 |>
   filter(POVERTY > 0) |>
@@ -131,18 +146,27 @@ h2_b2 <- svy_broad2 |>
     below_200pct_broad2     = survey_mean(below_200pct, na.rm = TRUE, vartype = NULL),
     n_unweighted_broad2     = unweighted(n()),
     n_weighted_broad2       = round(survey_total(1, vartype = NULL))
-  ) |> as_tibble() |>
-  mutate(below_200pct_broad2_pct = round(below_200pct_broad2 * 100, 1),
-         sector = factor("hs_nonprofit", levels = levels(h2$sector)))
+  ) |>
+  as_tibble() |>
+  mutate(
+    below_200pct_broad2_pct = round(below_200pct_broad2 * 100, 1),
+    sector = factor("hs_nonprofit", levels = levels(h2$sector))
+  )
 
 h2 <- h2 |>
-  left_join(h2_b1 |> select(sector, below_200pct_broad1_pct,
-                             n_unweighted_broad1, n_weighted_broad1), by = "sector") |>
-  left_join(h2_b2 |> select(sector, below_200pct_broad2_pct,
-                             n_unweighted_broad2, n_weighted_broad2), by = "sector")
+  left_join(h2_b1 |> select(
+    sector, below_200pct_broad1_pct,
+    n_unweighted_broad1, n_weighted_broad1
+  ), by = "sector") |>
+  left_join(h2_b2 |> select(
+    sector, below_200pct_broad2_pct,
+    n_unweighted_broad2, n_weighted_broad2
+  ), by = "sector")
 
-print(h2 |> select(sector, below_200pct_pct, below_200pct_broad1_pct, below_200pct_broad2_pct,
-                   n_weighted, n_weighted_broad1, n_weighted_broad2))
+print(h2 |> select(
+  sector, below_200pct_pct, below_200pct_broad1_pct, below_200pct_broad2_pct,
+  n_weighted, n_weighted_broad1, n_weighted_broad2
+))
 cat("\nParrott target: hs_nonprofit ~16%, govt ~10%, all private ~19%\n")
 cat("broad1 = HS industry nonprofit incl. homecare OCC\n")
 cat("broad2 = All HS industry workers any sector\n")

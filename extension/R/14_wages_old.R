@@ -79,7 +79,7 @@ make_wage_by_sector_density_plot <- function(data, title, xlim = c(0, 200000)) {
 acs_parrott_sectors <- acs_wages |>
   mutate(
     sector = case_when(
-      is_hs_wages ~ "Core HS Nonprofit",
+      parrott_hs_wages ~ "Core HS Nonprofit",
       sector == "govt" ~ "All Public Sector",
       sector == "priv_forprofit" ~ "All Private Sector",
     )
@@ -207,7 +207,7 @@ make_wage_by_sector_density_plot(
 ##############################################
 
 acs_city_only_hs_inds <- acs_wages |>
-  filter(in_hs_industry) |>
+  filter(is_hs_industry) |>
   mutate(
     sector = case_when(
       sector == "priv_nonprofit" ~ "Nonprofit",

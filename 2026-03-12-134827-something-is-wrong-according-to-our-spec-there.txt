@@ -764,7 +764,7 @@ changes
 
 ⏺ Now update the govt sector merge (local_govt + other_govt need combining) —
   actually let me check if that's already handled. Let me also update
-  analysis_sector to have a wage variant, and update 03_wages.R:
+  parrott_analysis_sector to have a wage variant, and update 03_wages.R:
 
 ⏺ Update(replication/R/01_acs_prep.R)
   ⎿  Added 11 lines, removed 2 lines
@@ -785,8 +785,8 @@ changes
       186  # Workers not in these three groups (other nonprofits, self-em
            ployed) get NA.
       187 +#                                                             
-      188 +# analysis_sector uses is_hs (broad, for demographics).       
-      189 +# analysis_sector_wages uses is_hs_wages (excl. homecare, for 
+      188 +# parrott_analysis_sector uses is_hs (broad, for demographics).       
+      189 +# parrott_analysis_sector_wages uses is_hs_wages (excl. homecare, for 
           +wage tables).                                                 
       190  
       191  d <- d |>
@@ -797,7 +797,7 @@ changes
       197        TRUE ~ NA_character_
       198 +    ) |> factor(levels = c("hs_nonprofit", "govt", "priv_forpr
           +ofit")),                                                      
-      199 +    analysis_sector_wages = case_when(                        
+      199 +    parrott_analysis_sector_wages = case_when(                        
       200 +      is_hs_wages ~ "hs_nonprofit",                           
       201 +      sector == "govt" ~ "govt",                              
       202 +      sector == "priv_forprofit" ~ "priv_forprofit",          
@@ -816,7 +816,7 @@ changes
           r(MULTYEAR)]))
       52  
       53 -# Three comparison sectors used throughout all wage tables (fro
-         -m analysis_sector):                                            
+         -m parrott_analysis_sector):                                            
       54 -#   1. hs_nonprofit      — core human services nonprofit worker
          -s (is_hs == TRUE)                                              
       53 +# Three comparison sectors used throughout all wage tables:    
@@ -826,24 +826,24 @@ changes
       56  #   2. govt              — all government workers
       57  #   3. priv_forprofit    — all private for-profit workers
       58  #
-      58 -# analysis_sector is constructed in 01_acs_prep.R; workers outs
+      58 -# parrott_analysis_sector is constructed in 01_acs_prep.R; workers outs
          -ide these three                                                
-      59 -# groups have analysis_sector == NA and are dropped here.      
-      59 +# analysis_sector_wages is constructed in 01_acs_prep.R; it use
+      59 -# groups have parrott_analysis_sector == NA and are dropped here.      
+      59 +# parrott_analysis_sector_wages is constructed in 01_acs_prep.R; it use
          +s is_hs_wages                                                  
       60 +# (which excludes homecare occupations from the HS nonprofit gr
          +oup) to avoid                                                  
       61 +# downward skew in the wage distribution. Workers outside these
          + three groups                                                  
-      62 +# have analysis_sector_wages == NA and are dropped here.       
+      62 +# have parrott_analysis_sector_wages == NA and are dropped here.       
       63  SECTORS_3 <- c("hs_nonprofit", "govt", "priv_forprofit")
       64  
       65  acs_3sec <- acs_wages |>
-      63 -  filter(!is.na(analysis_sector)) |>                           
-      64 -  mutate(sector = analysis_sector)  # alias for readability in 
+      63 -  filter(!is.na(parrott_analysis_sector)) |>                           
+      64 -  mutate(sector = parrott_analysis_sector)  # alias for readability in 
          -this script                                                    
-      66 +  filter(!is.na(analysis_sector_wages)) |>                     
-      67 +  mutate(sector = analysis_sector_wages)                       
+      66 +  filter(!is.na(parrott_analysis_sector_wages)) |>                     
+      67 +  mutate(sector = parrott_analysis_sector_wages)                       
       68  
       69  # NOTE: survey::svyquantile has a version-compatibility issue w
           ith vctrs that
@@ -861,23 +861,23 @@ changes
       230    mutate(comp_sector = "hs_nonprofit")
       231  
       232  occ_govt <- acs_wages |>
-      233 -  filter(analysis_sector == "govt", occ_group %in% OCC_GROUPS)
+      233 -  filter(parrott_analysis_sector == "govt", occ_group %in% OCC_GROUPS)
           - |>                                                           
-      233 +  filter(analysis_sector_wages == "govt", occ_group %in% OCC_G
+      233 +  filter(parrott_analysis_sector_wages == "govt", occ_group %in% OCC_G
           +ROUPS) |>                                                     
       234    mutate(comp_sector = "govt")
       235  
       236  occ_hosp <- acs_wages |>
 
-⏺ Now update the W4 and W5 tables in 03_wages.R to use analysis_sector_wages:
+⏺ Now update the W4 and W5 tables in 03_wages.R to use parrott_analysis_sector_wages:
 
 ⏺ Update(replication/R/03_wages.R)
   ⎿  Added 2 lines, removed 2 lines
       343    filter(
       344      occ_group %in% OCC_PROF,
       345      educ_cat  %in% EDUC_HIGH,
-      346 -    analysis_sector %in% SEC_2                                
-      346 +    analysis_sector_wages %in% SEC_2                          
+      346 -    parrott_analysis_sector %in% SEC_2                                
+      346 +    parrott_analysis_sector_wages %in% SEC_2                          
       347    ) |>
       348    mutate(
       349      occ_group = factor(occ_group,        levels = OCC_PROF),
@@ -885,8 +885,8 @@ changes
       401    filter(
       402      occ_group %in% OCC_PROF,
       403      educ_cat  %in% EDUC_HIGH,
-      404 -    analysis_sector %in% SEC_2                                
-      404 +    analysis_sector_wages %in% SEC_2                          
+      404 -    parrott_analysis_sector %in% SEC_2                                
+      404 +    parrott_analysis_sector_wages %in% SEC_2                          
       405    ) |>
       406    mutate(
       407      educ_cat  = factor(as.character(educ_cat), levels = EDUC_H
@@ -900,9 +900,9 @@ changes
       349      occ_group = factor(occ_group,        levels = OCC_PROF),
       350      educ_cat  = factor(as.character(educ_cat), levels = EDUC_H
            IGH),
-      351 -    sector    = factor(as.character(analysis_sector), levels =
+      351 -    sector    = factor(as.character(parrott_analysis_sector), levels =
           - SEC_2)                                                       
-      351 +    sector    = factor(as.character(analysis_sector_wages), le
+      351 +    sector    = factor(as.character(parrott_analysis_sector_wages), le
           +vels = SEC_2)                                                 
       352    ) |>
       353    group_by(occ_group, educ_cat, sector) |>
@@ -912,15 +912,15 @@ changes
       406    mutate(
       407      educ_cat  = factor(as.character(educ_cat), levels = EDUC_H
            IGH),
-      408 -    sector    = factor(as.character(analysis_sector), levels =
+      408 -    sector    = factor(as.character(parrott_analysis_sector), levels =
           - SEC_2),                                                      
-      408 +    sector    = factor(as.character(analysis_sector_wages), le
+      408 +    sector    = factor(as.character(parrott_analysis_sector_wages), le
           +vels = SEC_2),                                                
       409      race_grp  = if_else(poc, "poc", "white_nh")
       410    ) |>
       411    group_by(sector, educ_cat, race_grp) |>
 
-⏺ Now update 04_hardship.R — it uses analysis_sector and in_social_asst:
+⏺ Now update 04_hardship.R — it uses parrott_analysis_sector and in_social_asst:
 
 ⏺ Update(replication/R/04_hardship.R)
   ⎿  Added 6 lines, removed 7 lines
@@ -1078,7 +1078,7 @@ changes
 
 ⏺ I see two issues in the output:
   1. is_hs counts show NA (need to check why)
-  2. govt has 0 rows in analysis_sector — the sector variable has "local_govt"
+  2. govt has 0 rows in parrott_analysis_sector — the sector variable has "local_govt"
   and "other_govt", not "govt"
 
   The govt issue is a pre-existing bug. Let me fix both:
@@ -1100,14 +1100,14 @@ changes
       70    )
       71  
 
-⏺ Now fix the govt sector in analysis_sector:
+⏺ Now fix the govt sector in parrott_analysis_sector:
 
 ⏺ Read 1 file (ctrl+o to expand)
 
 ⏺ Update(replication/R/01_acs_prep.R)
   ⎿  Added 2 lines, removed 2 lines
       193    mutate(
-      194      analysis_sector = case_when(
+      194      parrott_analysis_sector = case_when(
       195        is_hs ~ "hs_nonprofit",
       196 -      sector == "govt" ~ "govt",                              
       196 +      sector %in% c("local_govt", "other_govt") ~ "govt",     
@@ -1115,7 +1115,7 @@ changes
       198        TRUE ~ NA_character_
       199      ) |> factor(levels = c("hs_nonprofit", "govt", "priv_forpr
            ofit")),
-      200      analysis_sector_wages = case_when(
+      200      parrott_analysis_sector_wages = case_when(
       201        is_hs_wages ~ "hs_nonprofit",
       202 -      sector == "govt" ~ "govt",                              
       202 +      sector %in% c("local_govt", "other_govt") ~ "govt",     

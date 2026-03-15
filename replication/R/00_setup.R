@@ -20,8 +20,8 @@ RAW_DIR <- file.path(REPLIC_DIR, "data", "raw")
 PROC_DIR <- file.path(REPLIC_DIR, "data", "processed")
 FIG_DIR <- file.path(REPLIC_DIR, "output", "figures")
 
-IPUMS_DDI <- file.path(RAW_DIR, "ipums", "usa_00004.xml")
-IPUMS_DAT <- file.path(RAW_DIR, "ipums", "usa_00004.dat.gz")
+IPUMS_DDI <- file.path(RAW_DIR, "ipums", "usa_00007.xml")
+IPUMS_DAT <- file.path(RAW_DIR, "ipums", "usa_00007.dat.gz")
 
 INDNAICS_XWALK <- file.path(RAW_DIR, "ipums", "indnaics_crosswalk_2000_onward_with_code_descriptions.csv")
 
@@ -59,6 +59,12 @@ OCC_ADMIN_SUPPORT <- c(5740L, 5860L, 5940L) # secretaries, office clerks, admin 
 OCC_JANITORS <- c(4220L) # janitors and building cleaners
 # Security guards: look up separately -- likely ~3600 range or 3930
 
+
+OCC_HOMECARE <- c(
+  3601L, # Home health aides
+  3602L, # Personal care aides
+  3603L # Nursing assistants
+)
 
 
 # EDUC codes (general version)

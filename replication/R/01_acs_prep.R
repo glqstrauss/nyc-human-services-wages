@@ -6,25 +6,7 @@
 
 source(here::here("replication/R/00_setup.R"))
 
-# ── 0. INDNAICS crosswalk ─────────────────────────────────────────────────────
-# Loads the IPUMS-provided crosswalk CSV, which covers all Census/ACS-specific
-# merged codes (M, P, S, Z suffixes) not found in official NAICS documentation.
-# Source: https://usa.ipums.org/usa/volii/indnaics.shtml
-
-indnaics_xwalk <- read_csv(
-  INDNAICS_XWALK,
-  col_types = cols(.default = "c"),
-  show_col_types = FALSE
-) |>
-  select(-1) |> # drop unnamed row-index column
-  rename(
-    indnaics = `2018-2022 ACS/PRCS INDNAICS CODE`,
-    industry_title = `Industry Title`
-  ) |>
-  select(indnaics, industry_title) |>
-  filter(!is.na(indnaics))
-
-# ── 1. Load IPUMS extract ─────────────────────────────────────────────────────
+# ── Load IPUMS extract ─────────────────────────────────────────────────────
 
 message("Reading IPUMS DDI...")
 ddi <- read_ipums_ddi(IPUMS_DDI)
@@ -34,7 +16,7 @@ raw <- read_ipums_micro(ddi, verbose = FALSE)
 
 message(paste("Loaded", format(nrow(raw), big.mark = ","), "rows total."))
 
-# ── 2. Filter to NYC, 2018-2022 sample, employed civilians ───────────────────
+# ── Filter to NYC, 2018-2022 sample, employed civilians ───────────────────
 
 d <- raw |>
   filter(
@@ -49,7 +31,7 @@ message(
   paste("After NYC/year/employed filters:", format(nrow(d), big.mark = ","), "rows.")
 )
 
-# ── 3. Sector variable ────────────────────────────────────────────────────────
+# ── Sector variable ────────────────────────────────────────────────────────--
 # Based on CLASSWKRD (detailed class of worker)
 # https://usa.ipums.org/usa-action/variables/CLASSWKR#codes_section
 
@@ -61,16 +43,33 @@ d <- d |>
       CLASSWKRD == 23L ~ "priv_nonprofit",
       CLASSWKRD %in% c(25L, 27L, 28L) ~ "govt",
       TRUE ~ NA_character_ # Capures NA and Unpaid Family Worker
-    ) |> factor()
+    ) |> factor(),
   )
 
-# ── 4. Core human services flag ───────────────────────────────────────────────
+d <- d |>
+  mutate(
+    city_wkr = CLASSWKRD == 28L, # Local Government sector
+  )
+
+# ── Core human services flag ───────────────────────────────────────────────
 # INDNAICS is an alphanumeric string in this extract.
 #
 # Core human services industry definition (Parrott 2025):
 #   NAICS 624 — Social Assistance (6241, 6242, 6243, plus merged codes)
 #   NAICS 623 — Residential Care Facilities (6231, 623M)
 #   EXCLUDE:  6244 — Child Day Care Services
+#
+# 62142 is Outpatient Mental Health and Substance Abuse Centers,
+# which cannot be included because it is merged into 6214 ("Outpatient Care Centers")
+# which includes such disparate industries as Kidney Dialysis and HMO Medical Centers.
+# The breakdown of workers in this merged code that we must exclude is:
+#   sector             n   nwt
+#   <fct>          <int> <dbl>
+# 1 govt             109  2915
+# 2 priv_forprofit  1053 26736
+# 3 priv_nonprofit   407 10204
+# 4 self_employed    137  3466
+# 5 NA                 5   110
 #
 # The 623 codes capture group homes, residential mental health/substance abuse
 # facilities, supportive housing, and I/DD residences — all major components
@@ -80,11 +79,11 @@ d <- d |>
 # report's Figure 5 total of 60,095. The original ^624-only definition yielded
 # only ~48k, which was too narrow.
 #
-# `is_hs` is the primary sample flag for demographics/headcount (Figs 4-8).
+# `parrott_hs` is the primary sample flag for demographics/headcount (Figs 4-8).
 # It does NOT exclude homecare occupations, matching the report's Figure 5
 # total of ~60,095 workers.
 #
-# `is_hs_wages` further excludes home health aides, personal care aides, and
+# `parrott_hs_wages` further excludes home health aides, personal care aides, and
 # nursing assistants. Used for wage analysis (Figs 10-15) because "including
 # [homecare workers] would have skewed the wage distribution downward"
 # (Parrott 2025, p. 9).
@@ -96,27 +95,46 @@ d <- d |>
 d <- d |>
   mutate(
     # Social Assistance (624*) + Residential Care (623*)  - Childcare (6244)
-    in_hs_industry = grepl("^62[34]", INDNAICS) &
+    is_hs_industry = grepl("^62[34]", INDNAICS) &
       INDNAICS != 6244,
-    homecare_occ = OCC %in% c(
-      3601L, # Home health aides
-      3602L, # Personal care aides
-      3603L # Nursing assistants
-    ),
-    is_hs = in_hs_industry &
-      !is.na(sector) & sector == "priv_nonprofit",
-    is_hs_wages = is_hs & !homecare_occ
+    occ_group = case_when(
+      OCC %in% OCC_SOCIAL_WORKERS ~ "social_workers",
+      OCC %in% OCC_COUNSELORS ~ "counselors",
+      OCC %in% OCC_HS_ASSISTANTS ~ "hs_assistants",
+      OCC %in% OCC_MANAGERS ~ "managers",
+      OCC %in% OCC_ADMIN_SUPPORT ~ "admin_support",
+      OCC %in% OCC_JANITORS ~ "janitors",
+      # homecare will be *excluded* from wage analysis, but not demo analysis
+      OCC %in% OCC_HOMECARE ~ "homecare",
+      TRUE ~ NA_character_
+    ) |> factor(),
+    # TODO: should this also exclude homecare?
+    is_hs_occ = !is.na(occ_group)
   )
 
+d <- d |>
+  mutate(
+    occ_name = as.character(haven::as_factor(US2022C_OCCP)),
+    occ_class = substr(occ_name, 1, 3)
+  )
+
+# ── Sample flags for Parrott replication ───────────────────────────────────────────--
+
+d <- d |> mutate(
+  parrott_hs = is_hs_industry &
+    !is.na(sector) & sector == "priv_nonprofit",
+  parrott_hs_wages = parrott_hs & occ_group != "homecare"
+)
+
 message(paste(
-  "Core HS nonprofit (is_hs):",
-  format(sum(d$is_hs), big.mark = ","), "unweighted,",
-  format(round(sum(d$PERWT[d$is_hs])), big.mark = ","), "weighted."
+  "Core HS nonprofit (parrott_hs):",
+  format(sum(d$parrott_hs), big.mark = ","), "unweighted,",
+  format(round(sum(d$PERWT[d$parrott_hs])), big.mark = ","), "weighted."
 ))
 message(paste(
-  "  Wage-eligible (is_hs_wages, excl. homecare):",
-  format(sum(d$is_hs_wages), big.mark = ","), "unweighted.",
-  format(round(sum(d$PERWT[d$is_hs_wages])), big.mark = ","), "weighted."
+  "  Wage-eligible (parrott_hs_wages, excl. homecare):",
+  format(sum(d$parrott_hs_wages), big.mark = ","), "unweighted.",
+  format(round(sum(d$PERWT[d$parrott_hs_wages])), big.mark = ","), "weighted."
 ))
 
 # Flag private hospitals (comparison group for occupation-level tables)
@@ -126,22 +144,7 @@ d <- d |>
     priv_hosp = INDNAICS == "621M" & sector == "priv_forprofit"
   )
 
-# ── 5. Occupation group variable ─────────────────────────────────────────────
-
-d <- d |>
-  mutate(
-    occ_group = case_when(
-      OCC %in% OCC_SOCIAL_WORKERS ~ "social_workers",
-      OCC %in% OCC_COUNSELORS ~ "counselors",
-      OCC %in% OCC_HS_ASSISTANTS ~ "hs_assistants",
-      OCC %in% OCC_MANAGERS ~ "managers",
-      OCC %in% OCC_ADMIN_SUPPORT ~ "admin_support",
-      OCC %in% OCC_JANITORS ~ "janitors",
-      TRUE ~ NA_character_
-    ) |> factor()
-  )
-
-# ── 6. Education category ─────────────────────────────────────────────────────
+# ── Education category ─────────────────────────────────────────────────────--
 # EDUC general variable codes (see 00_setup.R for full codebook)
 
 d <- d |>
@@ -159,19 +162,46 @@ d <- d |>
     )
   )
 
-# ── 7. Race / ethnicity ───────────────────────────────────────────────────────
-# Priority: Hispanic (regardless of race), then non-Hispanic race categories.
+# ── Imputed experience ─────────────────────────────────────────────────────--
+
+# https://economics.stackexchange.com/questions/53650
+# Added
+
+d <- d |>
+  mutate(
+    est_age_started_work = case_when(
+      educ_cat == "lths" ~ 17L,
+      educ_cat == "hs" ~ 19L,
+      educ_cat == "some_college" ~ 21L,
+      educ_cat == "bachelors" ~ 23L,
+      educ_cat == "postgrad" ~ 25L,
+    ),
+    experience = AGE - est_age_started_work,
+    experience_cat = case_when(
+      experience < 5 ~ "0-5 years",
+      experience < 10 ~ "5-10 years",
+      experience < 20 ~ "10-20 years",
+      experience >= 20 ~ "20+ years",
+      TRUE ~ NA_character_
+    ) |> factor(
+      levels = c("0-5 years", "5-10 years", "10-20 years", "20+ years"),
+      ordered = TRUE
+    )
+  ) |>
+  select(-est_age_started_work)
+
+# ── Race / ethnicity ───────────────────────────────────────────────────────--
 
 d <- d |>
   mutate(
     race_eth = case_when(
-      HISPAN != 0 ~ "hispanic",
+      HISPAN != 0 ~ "hispanic", # regardless of race
       RACE == 1 ~ "white_nh",
       RACE == 2 ~ "black_nh",
       RACE %in% 4:6 ~ "asian_nh",
       TRUE ~ "other_nh"
     ) |> factor(),
-    poc = race_eth != "white_nh", # person of color indicator
+    poc = race_eth != "white_nh",
     female = SEX == 2L
   )
 
@@ -201,52 +231,84 @@ d <- d |>
 # Major TODO: Does this capture NYC H+H workers?
 
 d <- d |> mutate(
-  is_city_wkr = if_else(CLASSWKRD == 28L, TRUE, FALSE)
+  is_city_wkr = CLASSWKRD == 28L, # Local Government sector
+  is_priv_fp_wkr = sector == "priv_forprofit",
+  is_priv_np_wkr = sector == "priv_nonprofit"
 )
 
 # ── 11. Unweighted cell-size check ───────────────────────────────────────────
 
 check_cells <- d |>
-  filter(is_hs, full_time) |>
+  filter(parrott_hs, full_time) |>
   summarize(n_unweighted = n(), n_weighted = sum(PERWT), .by = educ_cat)
 message("Core HS nonprofit full-time workers by education (unweighted):")
 print(check_cells)
 
 check_occ <- d |>
-  filter(is_hs, full_time) |>
+  filter(parrott_hs, full_time) |>
   summarize(n_unweighted = n(), n_weighted = sum(PERWT), .by = occ_group) |>
   arrange(desc(n_unweighted))
 message("Core HS nonprofit full-time workers by occupation group (unweighted):")
 print(check_occ)
 
-# ── 12. Three-way analysis sector variable ────────────────────────────────────
+# ── Three-way analysis sector variable ────────────────────────────────────
 # Clean classification for all downstream demographic and wage tables:
 #   "hs_nonprofit"   = core human services nonprofit workers
 #   "govt"           = all government workers
 #   "priv_forprofit" = all private for-profit workers (any industry)
 # Workers not in these three groups (other nonprofits, self-employed) get NA.
 #
-# analysis_sector uses is_hs (broad, for demographics).
-# analysis_sector_wages uses is_hs_wages (excl. homecare, for wage tables).
+# parrott_analysis_sector uses parrott_hs (broad, for demographics).
+# parrott_analysis_sector_wages uses parrott_hs_wages (excl. homecare, for wage tables).
 
 d <- d |>
   mutate(
-    analysis_sector = case_when(
-      is_hs ~ "hs_nonprofit",
+    parrott_analysis_sector = case_when(
+      parrott_hs ~ "hs_nonprofit",
       sector == "govt" ~ "govt",
       sector == "priv_forprofit" ~ "priv_forprofit",
       TRUE ~ NA_character_
     ) |> factor(levels = c("hs_nonprofit", "govt", "priv_forprofit")),
-    analysis_sector_wages = case_when(
-      is_hs_wages ~ "hs_nonprofit",
+    parrott_analysis_sector_wages = case_when(
+      parrott_hs_wages ~ "hs_nonprofit",
       sector == "govt" ~ "govt",
       sector == "priv_forprofit" ~ "priv_forprofit",
       TRUE ~ NA_character_
     ) |> factor(levels = c("hs_nonprofit", "govt", "priv_forprofit"))
   )
 
-message("analysis_sector distribution:")
-print(summarize(d, n_unweighted = n(), n_weighted = sum(PERWT), .by = analysis_sector))
+message("parrott_analysis_sector distribution:")
+print(summarize(d, n_unweighted = n(), n_weighted = sum(PERWT), .by = parrott_analysis_sector))
+
+# ── Extension analysis groups ─────────────────────────────────────────────────────
+
+# TODO
+
+
+# ── INDNAICS crosswalk ─────────────────────────────────────────────────────
+# Loads the IPUMS-provided crosswalk CSV, which covers all Census/ACS-specific
+# merged codes (M, P, S, Z suffixes) not found in official NAICS documentation.
+# Source: https://usa.ipums.org/usa/volii/indnaics.shtml
+
+indnaics_xwalk <- read_csv(
+  INDNAICS_XWALK,
+  col_types = cols(.default = "c"),
+  show_col_types = FALSE
+) |>
+  select(-1) |> # drop unnamed row-index column
+  rename(
+    indnaics = `2018-2022 ACS/PRCS INDNAICS CODE`,
+    industry_title = `Industry Title`
+  ) |>
+  select(indnaics, industry_title) |>
+  filter(!is.na(indnaics))
+
+d <- d |>
+  left_join(
+    indnaics_xwalk,
+    by = join_by(INDNAICS == indnaics),
+    relationship = "many-to-one"
+  )
 
 # ── 12. Save ──────────────────────────────────────────────────────────────────
 

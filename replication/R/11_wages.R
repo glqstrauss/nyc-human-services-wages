@@ -51,20 +51,20 @@ acs_wages <- acs_wages |>
   mutate(incwage_real = round(INCWAGE * CPI_FACTORS[as.character(MULTYEAR)]))
 
 # Three comparison sectors used throughout all wage tables:
-#   1. hs_nonprofit      — core HS nonprofit workers (is_hs_wages == TRUE;
+#   1. hs_nonprofit      — core HS nonprofit workers (parrott_hs_wages == TRUE;
 #                           excludes homecare occupations)
 #   2. govt              — all government workers
 #   3. priv_forprofit    — all private for-profit workers
 #
-# analysis_sector_wages is constructed in 01_acs_prep.R; it uses is_hs_wages
+# parrott_analysis_sector_wages is constructed in 01_acs_prep.R; it uses parrott_hs_wages
 # (which excludes homecare occupations from the HS nonprofit group) to avoid
 # downward skew in the wage distribution. Workers outside these three groups
-# have analysis_sector_wages == NA and are dropped here.
+# have parrott_analysis_sector_wages == NA and are dropped here.
 SECTORS_3 <- c("hs_nonprofit", "govt", "priv_forprofit")
 
 acs_3sec <- acs_wages |>
-  filter(!is.na(analysis_sector_wages)) |>
-  mutate(sector = analysis_sector_wages)
+  filter(!is.na(parrott_analysis_sector_wages)) |>
+  mutate(sector = parrott_analysis_sector_wages)
 
 # NOTE: survey::svyquantile has a version-compatibility issue with vctrs that
 # breaks srvyr's survey_median() inside summarise(). We instead use a manual
@@ -212,7 +212,7 @@ cat("                 postgrad  ~37% below for-profit, ~29% below govt)\n")
 #
 # Three occupational comparison groups vs three sectors:
 #   Sectors: hs_nonprofit, govt, priv_hospital
-#     (priv_hospital = is_hs==FALSE & priv_hosp==TRUE)
+#     (priv_hospital = parrott_hs==FALSE & priv_hosp==TRUE)
 #
 # Occupations: social_workers, counselors, hs_assistants
 #   + reference: admin_support, janitors_security
@@ -226,20 +226,20 @@ OCC_GROUPS <- c(
 )
 
 # Build occupation-sector frame with three custom sectors:
-#   hs_nonprofit  — core HS nonprofit (is_hs & sector == "hs_nonprofit")
+#   hs_nonprofit  — core HS nonprofit (parrott_hs & sector == "hs_nonprofit")
 #   govt          — government (sector == "govt")
-#   priv_hospital — private hospital workers (is_hs==FALSE & priv_hosp==TRUE)
+#   priv_hospital — private hospital workers (parrott_hs==FALSE & priv_hosp==TRUE)
 #
 # For hs_nonprofit and govt we use only workers in the listed occ_groups.
 # For priv_hospital there is no occ_group filter — we use the full private
 # hospital population and sub-set only when computing gaps at occupation level.
 
 occ_hs <- acs_wages |>
-  filter(is_hs_wages == TRUE, occ_group %in% OCC_GROUPS) |>
+  filter(parrott_hs_wages == TRUE, occ_group %in% OCC_GROUPS) |>
   mutate(comp_sector = "hs_nonprofit")
 
 occ_govt <- acs_wages |>
-  filter(analysis_sector_wages == "govt", occ_group %in% OCC_GROUPS) |>
+  filter(parrott_analysis_sector_wages == "govt", occ_group %in% OCC_GROUPS) |>
   mutate(comp_sector = "govt")
 
 occ_hosp <- acs_wages |>
@@ -352,12 +352,12 @@ w4_long <- acs_wages |>
   filter(
     occ_group %in% OCC_PROF,
     educ_cat %in% EDUC_HIGH,
-    analysis_sector_wages %in% SEC_2
+    parrott_analysis_sector_wages %in% SEC_2
   ) |>
   mutate(
     occ_group = factor(occ_group, levels = OCC_PROF),
     educ_cat  = factor(as.character(educ_cat), levels = EDUC_HIGH),
-    sector    = factor(as.character(analysis_sector_wages), levels = SEC_2)
+    sector    = factor(as.character(parrott_analysis_sector_wages), levels = SEC_2)
   ) |>
   group_by(occ_group, educ_cat, sector) |>
   summarise(
@@ -410,11 +410,11 @@ w5_long <- acs_wages |>
   filter(
     occ_group %in% OCC_PROF,
     educ_cat %in% EDUC_HIGH,
-    analysis_sector_wages %in% SEC_2
+    parrott_analysis_sector_wages %in% SEC_2
   ) |>
   mutate(
     educ_cat  = factor(as.character(educ_cat), levels = EDUC_HIGH),
-    sector    = factor(as.character(analysis_sector_wages), levels = SEC_2),
+    sector    = factor(as.character(parrott_analysis_sector_wages), levels = SEC_2),
     race_grp  = if_else(poc, "poc", "white_nh")
   ) |>
   group_by(sector, educ_cat, race_grp) |>

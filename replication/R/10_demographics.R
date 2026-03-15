@@ -145,7 +145,7 @@ make_sector_subset <- function(svy, sector_expr) {
 #   nonprofit workers to all NYC private sector workers.
 #
 # Groups:
-#   hs_nonprofit   : is_hs == TRUE
+#   hs_nonprofit   : parrott_hs == TRUE
 #   all_private    : sector %in% c("priv_forprofit","priv_nonprofit_other",
 #                                  "hs_nonprofit")
 # =============================================================================
@@ -163,7 +163,7 @@ compute_gender_share <- function(svy_design, group_label) {
 }
 
 tbl1_hs <- svy_ft |>
-  filter(is_hs == TRUE) |>
+  filter(parrott_hs == TRUE) |>
   compute_gender_share("hs_nonprofit")
 
 tbl1_priv <- svy_ft |>
@@ -193,9 +193,9 @@ compute_race_share <- function(svy_design, group_label) {
   svy_design |>
     summarise(
       share_poc      = survey_mean(race_eth != "white_nh", vartype = "ci", na.rm = TRUE),
-      share_black    = survey_mean(race_eth == "black_nh",  vartype = "ci", na.rm = TRUE),
-      share_hispanic = survey_mean(race_eth == "hispanic",  vartype = "ci", na.rm = TRUE),
-      share_asian    = survey_mean(race_eth == "asian_nh",  vartype = "ci", na.rm = TRUE),
+      share_black    = survey_mean(race_eth == "black_nh", vartype = "ci", na.rm = TRUE),
+      share_hispanic = survey_mean(race_eth == "hispanic", vartype = "ci", na.rm = TRUE),
+      share_asian    = survey_mean(race_eth == "asian_nh", vartype = "ci", na.rm = TRUE),
       n_unweighted   = unweighted(n()),
       n_weighted     = round(survey_total(1, vartype = NULL))
     ) |>
@@ -203,7 +203,7 @@ compute_race_share <- function(svy_design, group_label) {
 }
 
 tbl2_hs <- svy_ft |>
-  filter(is_hs == TRUE) |>
+  filter(parrott_hs == TRUE) |>
   compute_race_share("hs_nonprofit")
 
 tbl2_priv <- svy_ft |>
@@ -256,7 +256,7 @@ compute_gender_race_share <- function(svy_design, group_label) {
 }
 
 tbl3_hs <- svy_ft |>
-  filter(is_hs == TRUE) |>
+  filter(parrott_hs == TRUE) |>
   compute_gender_race_share("hs_nonprofit")
 
 tbl3_priv <- svy_ft |>
@@ -292,17 +292,18 @@ compute_educ_share <- function(svy_design, group_label) {
   map_dfr(educ_levels, function(lvl) {
     svy_design |>
       summarise(
-        share        = survey_mean(as.character(educ_cat) == lvl,
-                                   vartype = "ci", na.rm = TRUE),
+        share = survey_mean(as.character(educ_cat) == lvl,
+          vartype = "ci", na.rm = TRUE
+        ),
         n_unweighted = unweighted(n()),
-        n_weighted   = round(survey_total(1, vartype = NULL))
+        n_weighted = round(survey_total(1, vartype = NULL))
       ) |>
       mutate(educ_cat = lvl, group = group_label, .before = 1)
   })
 }
 
 tbl4_hs <- svy_ft |>
-  filter(is_hs == TRUE) |>
+  filter(parrott_hs == TRUE) |>
   compute_educ_share("hs_nonprofit")
 
 tbl4_priv <- svy_ft |>
@@ -347,7 +348,7 @@ message("\nComputing Table 5: Full-time vs. part-time share...")
 compute_ft_share <- function(svy_design, group_label) {
   svy_design |>
     summarise(
-      share_fulltime = survey_mean(full_time,  vartype = "ci", na.rm = TRUE),
+      share_fulltime = survey_mean(full_time, vartype = "ci", na.rm = TRUE),
       share_parttime = survey_mean(!full_time, vartype = "ci", na.rm = TRUE),
       n_unweighted   = unweighted(n()),
       n_weighted     = round(survey_total(1, vartype = NULL))
@@ -356,7 +357,7 @@ compute_ft_share <- function(svy_design, group_label) {
 }
 
 tbl5_hs <- svy_full |>
-  filter(is_hs == TRUE) |>
+  filter(parrott_hs == TRUE) |>
   compute_ft_share("hs_nonprofit")
 
 tbl5_priv <- svy_full |>
