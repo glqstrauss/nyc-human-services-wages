@@ -46,11 +46,6 @@ d <- d |>
     ) |> factor(),
   )
 
-d <- d |>
-  mutate(
-    city_wkr = CLASSWKRD == 28L, # Local Government sector
-  )
-
 # ── Core human services flag ───────────────────────────────────────────────
 # INDNAICS is an alphanumeric string in this extract.
 #
@@ -108,14 +103,50 @@ d <- d |>
       OCC %in% OCC_HOMECARE ~ "homecare",
       TRUE ~ NA_character_
     ) |> factor(),
-    # TODO: should this also exclude homecare?
-    is_hs_occ = !is.na(occ_group)
+    is_hs_occ = !is.na(occ_group),
+    is_hs_occ_nh = !is.na(occ_group) & occ_group != "homecare"
   )
 
 d <- d |>
   mutate(
     occ_name = as.character(haven::as_factor(US2022C_OCCP)),
     occ_class = substr(occ_name, 1, 3)
+  )
+
+d <- d |>
+  mutate(
+    # https://www.bls.gov/tus/iocodes/census18ocodes.pdf
+    # This is a subset manual coding of the full classification,
+    # focused on occupations that dont match is_hs_occ, in order
+    # to say something about the large "other" category of non-core
+    # occupations in the report.
+    occ_class_desc = case_match(
+      occ_class,
+      "MGR" ~ "Managers",
+      "BUS" ~ "Business Operations",
+      "FIN" ~ "Financial Operations",
+      "CMM" ~ "Computer and Mathematical",
+      "SCI" ~ "Life, Physical, and Social Science",
+      "LGL" ~ "Legal",
+      "EDU" ~ "Educational Instruction and Library",
+      "ENT" ~ "Arts, Design, Entertainment, Sports, and Media",
+      "MED" ~ "Healthcare Practitioners and Technical",
+      "HLS" ~ "Healthcare Support",
+      "PRT" ~ "Protective Service",
+      "EAT" ~ "Food Preparation and Serving",
+      "CLN" ~ "Building and Grounds Cleaning and Maintenance",
+      "PRS" ~ "Personal Care and Service",
+      "OFF" ~ "Office and Administrative Support",
+      "TRN" ~ "Transportation and Material Moving",
+      .default = NA_character_
+    ),
+    occ_broad_class = case_match(
+      occ_class,
+      c("BUS", "FIN", "LGL") ~ "Business, Financial, and Legal",
+      c("EAT", "CLN", "TRN", "PRT") ~ "Service and Maintenance",
+      c("MED", "HLS") ~ "Healthcare",
+      .default = occ_class_desc # if not grouped, use original classification
+    )
   )
 
 # ── Sample flags for Parrott replication ───────────────────────────────────────────--
@@ -222,18 +253,24 @@ d <- d |>
 d <- d |>
   mutate(
     full_time = UHRSWORK >= 35L,
+    part_time = UHRSWORK > 0L & UHRSWORK < 35L,
     # Exclude top-coded wages and zero wages for wage analysis
     wage_valid = INCWAGE > 0L & INCWAGE < INCWAGE_TOPCODE
   )
 
-# ── 10. City Worker Flag ───────────────────────────────────────────
-
-# Major TODO: Does this capture NYC H+H workers?
+# ── 10. Analysis Sector Flags ───────────────────────────────────────────
 
 d <- d |> mutate(
   is_city_wkr = CLASSWKRD == 28L, # Local Government sector
   is_priv_fp_wkr = sector == "priv_forprofit",
-  is_priv_np_wkr = sector == "priv_nonprofit"
+  is_priv_np_wkr = sector == "priv_nonprofit",
+  # for govt-level breakdown justifying restriction to city workers...
+  govt_level = case_when(
+    CLASSWKRD == 25L ~ "federal",
+    CLASSWKRD == 27L ~ "state",
+    CLASSWKRD == 28L ~ "local",
+    TRUE ~ NA_character_
+  )
 )
 
 # ── 11. Unweighted cell-size check ───────────────────────────────────────────
@@ -278,12 +315,15 @@ d <- d |>
   )
 
 message("parrott_analysis_sector distribution:")
-print(summarize(d, n_unweighted = n(), n_weighted = sum(PERWT), .by = parrott_analysis_sector))
+print(
+  d |>
+    group_by(parrott_analysis_sector) |>
+    summarize(n_unweighted = n(), n_weighted = sum(PERWT))
+)
 
 # ── Extension analysis groups ─────────────────────────────────────────────────────
 
-# TODO
-
+# TODO should categorize these up front once initial round of analysis is done...
 
 # ── INDNAICS crosswalk ─────────────────────────────────────────────────────
 # Loads the IPUMS-provided crosswalk CSV, which covers all Census/ACS-specific

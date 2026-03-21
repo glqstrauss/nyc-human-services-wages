@@ -34,7 +34,7 @@ svy <- acs |>
     # since civil service titles dictate pay standards across
     # "industry" for city workers and the sample is too small
     # to subset down to just those in the industry.
-    occ_analysis = (is_hs_occ & is_city_wkr) |
+    occ_analysis = (is_hs_industry & is_hs_occ & is_city_wkr) |
       (is_hs_industry & is_hs_occ & is_priv_np_wkr) |
       (is_priv_fp_wkr)
   )
@@ -53,8 +53,8 @@ table121_pct_women_poc <- svy |>
   filter(ind_analysis) |>
   group_by(sector) |>
   summarize(
-    pct_women = survey_mean(female),
-    pct_poc = survey_mean(poc),
+    pct_women = survey_mean(female, vartype = "cv"),
+    pct_poc = survey_mean(poc, vartype = "cv"),
     n = survey_total(),
     obs = unweighted(n())
   )
@@ -63,13 +63,11 @@ table121_pct_gender_x_race <- svy |>
   filter(ind_analysis) |>
   group_by(sector, gender_race) |>
   summarize(
-    prop = survey_prop(),
-    obs = unweighted(n()),
-    n = survey_total(),
+    prop = survey_prop(vartype = "cv")
   ) |>
   pivot_wider(
-    names_from = gender_race,
-    values_from = c(prop, prop_se, n, n_se, obs)
+    names_from = sector,
+    values_from = c(prop, prop_cv)
   )
 
 # 1.2.2
@@ -77,20 +75,18 @@ table121_pct_gender_x_race <- svy |>
 # description: This is similar to Parrott's Figure 7 (2025) but comparing public vs
 # nonprofit. Produce versions for core occupations and industry-wide definitions.
 # analysis: city workers on average are more experienced (older) but similarly likely to
-# have a college degree. This says something about the pay gap, and perhaps says something
-# about working conditions and turnover as well.
+# have a college degree. This says something about the pay gap, and perhaps says
+# something about working conditions and turnover as well.
 
 table122_pct_educ_cat_industry <- svy |>
   filter(ind_analysis) |>
   group_by(sector, educ_cat) |>
   summarize(
-    prop = survey_prop(),
-    n = survey_total(),
-    obs = unweighted(n())
+    prop = survey_prop(vartype = "cv"),
   ) |>
   pivot_wider(
-    names_from = educ_cat,
-    values_from = c(prop, prop_se, n, n_se, obs)
+    names_from = sector,
+    values_from = c(prop, prop_cv)
   )
 
 # Robust to using the core occupations definition -- still large gaps for postgrad and college
@@ -98,13 +94,11 @@ table122_pct_educ_cat_occ <- svy |>
   filter(occ_analysis) |>
   group_by(sector, educ_cat) |>
   summarize(
-    prop = survey_prop(),
-    n = survey_total(),
-    obs = unweighted(n())
+    prop = survey_prop(vartype = "cv")
   ) |>
   pivot_wider(
-    names_from = educ_cat,
-    values_from = c(prop, prop_se, n, n_se, obs)
+    names_from = sector,
+    values_from = c(prop, prop_cv)
   )
 
 # 1.2.3
@@ -133,25 +127,26 @@ table123_experience_occ <- bind_rows(
     summarize_experience() |>
     mutate(educ_cat = "all")
 ) |> pivot_wider(
-  names_from = educ_cat,
+  names_from = sector,
   values_from = c(avg_exp, avg_exp_se, n, n_se, obs)
 )
 
-
-table123_experience_occ_educ_cat <- svy |>
-  filter(occ_analysis) |>
-  group_by(sector, educ_cat) |>
-  summarize_experience()
-
-table123_experience_industry <- svy |>
-  filter(ind_analysis) |>
-  group_by(sector, educ_cat) |>
-  summarize(
-    prop = survey_prop(),
-    n = survey_total(),
-    obs = unweighted(n())
-  ) |>
+# KEY FINDING: the experience gap is 5-6 years among highly-educated workers
+table123_experience_high_ed_occ <- svy |>
+  filter(occ_analysis, educ_cat %in% c("bachelors", "postgrad")) |>
+  group_by(sector) |>
+  summarize_experience() |>
   pivot_wider(
-    names_from = educ_cat,
-    values_from = c(prop, prop_se, n, n_se, obs)
+    names_from = sector,
+    values_from = c(avg_exp, avg_exp_se, n, n_se, obs)
+  )
+
+# Robust to using the industry definition, though the gap is slightly smaller.
+table123_experience_high_ed_ind <- svy |>
+  filter(ind_analysis, educ_cat %in% c("bachelors", "postgrad")) |>
+  group_by(sector) |>
+  summarize_experience() |>
+  pivot_wider(
+    names_from = sector,
+    values_from = c(avg_exp, avg_exp_se, n, n_se, obs)
   )
