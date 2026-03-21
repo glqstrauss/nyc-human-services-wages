@@ -11,6 +11,34 @@
 # definition. If we look at industry-wide codes, we will need to be able to
 # answer more questions about the composition of the public sector comparison group.
 
+source(here::here("extension/R/00_setup.R"))
+
+acs <- readRDS(file.path(REPLIC_PROC_DIR, "acs_prepared.rds"))
+
+svy <- acs |>
+  as_survey_rep(
+    weights = PERWT,
+    repweights = matches("REPWTP[0-9]+"),
+    type = "ACS",
+    mse = TRUE
+  ) |>
+  mutate(
+    # hs_industry city and nonprofit workers
+    # plus all private sector workers as baseline
+    ind_analysis = (is_hs_industry & is_city_wkr) |
+      (is_hs_industry & is_priv_np_wkr) |
+      (is_priv_fp_wkr),
+    # hs_occ city and nonprofit workers
+    # plus all private sector workers as baseline
+    # For city, we do NOT require that they be in the industry,
+    # since civil service titles dictate pay standards across
+    # "industry" for city workers and the sample is too small
+    # to subset down to just those in the industry.
+    occ_analysis = (is_hs_occ & is_city_wkr) |
+      (is_hs_industry & is_hs_occ & is_priv_np_wkr) |
+      (is_priv_fp_wkr)
+  )
+
 # 1.2.1
 # title: Gender and race/ethnic characteristics of public vs nonprofit core human
 # service workers, 2018/22
@@ -21,11 +49,63 @@
 # We could also consider producing TWO versions: one for industry and one for "core
 # occupations" only.
 
+table121_pct_women_poc <- svy |>
+  filter(ind_analysis) |>
+  group_by(sector) |>
+  summarize(
+    pct_women = survey_mean(female),
+    pct_poc = survey_mean(poc),
+    n = survey_total(),
+    obs = unweighted(n())
+  )
+
+table121_pct_gender_x_race <- svy |>
+  filter(ind_analysis) |>
+  group_by(sector, gender_race) |>
+  summarize(
+    prop = survey_prop(),
+    obs = unweighted(n()),
+    n = survey_total(),
+  ) |>
+  pivot_wider(
+    names_from = gender_race,
+    values_from = c(prop, prop_se, n, n_se, obs)
+  )
+
 # 1.2.2
 # title: Education levels of public vs nonprofit core human service workers, 2018/22
 # description: This is similar to Parrott's Figure 7 (2025) but comparing public vs
 # nonprofit. Produce versions for core occupations and industry-wide definitions.
+# analysis: city workers on average are more experienced (older) but similarly likely to
+# have a college degree. This says something about the pay gap, and perhaps says something
+# about working conditions and turnover as well.
 
+table122_pct_educ_cat_industry <- svy |>
+  filter(ind_analysis) |>
+  group_by(sector, educ_cat) |>
+  summarize(
+    prop = survey_prop(),
+    n = survey_total(),
+    obs = unweighted(n())
+  ) |>
+  pivot_wider(
+    names_from = educ_cat,
+    values_from = c(prop, prop_se, n, n_se, obs)
+  )
+
+# Robust to using the core occupations definition -- still large gaps for postgrad and college
+table122_pct_educ_cat_occ <- svy |>
+  filter(occ_analysis) |>
+  group_by(sector, educ_cat) |>
+  summarize(
+    prop = survey_prop(),
+    n = survey_total(),
+    obs = unweighted(n())
+  ) |>
+  pivot_wider(
+    names_from = educ_cat,
+    values_from = c(prop, prop_se, n, n_se, obs)
+  )
 
 # 1.2.3
 # title: Years of experience in public vs nonprofit core human service workers, 2018/22
@@ -34,3 +114,44 @@
 # bucket experience into categories (0-5 years, 5-10 years, 10-20 years, 20+ years).
 # TODO: we need to add imputed experience to the ACS prep. See the following discussion:
 # https://economics.stackexchange.com/questions/53650
+
+summarize_experience <- \(x) summarize(
+  x,
+  avg_exp = survey_mean(experience),
+  n = survey_total(),
+  obs = unweighted(n())
+)
+
+table123_experience_occ <- bind_rows(
+  svy |>
+    filter(occ_analysis) |>
+    group_by(sector, educ_cat) |>
+    summarize_experience(),
+  svy |>
+    filter(occ_analysis) |>
+    group_by(sector) |>
+    summarize_experience() |>
+    mutate(educ_cat = "all")
+) |> pivot_wider(
+  names_from = educ_cat,
+  values_from = c(avg_exp, avg_exp_se, n, n_se, obs)
+)
+
+
+table123_experience_occ_educ_cat <- svy |>
+  filter(occ_analysis) |>
+  group_by(sector, educ_cat) |>
+  summarize_experience()
+
+table123_experience_industry <- svy |>
+  filter(ind_analysis) |>
+  group_by(sector, educ_cat) |>
+  summarize(
+    prop = survey_prop(),
+    n = survey_total(),
+    obs = unweighted(n())
+  ) |>
+  pivot_wider(
+    names_from = educ_cat,
+    values_from = c(prop, prop_se, n, n_se, obs)
+  )

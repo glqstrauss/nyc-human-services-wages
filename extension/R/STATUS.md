@@ -1,0 +1,3 @@
+In New York City, publicly funded "human services" are almost always delivered by nonprofit provider organizations. As the City's cost-of-living crisis has exploded and needs have grown, so too have contracts with these organizations, which totalled just under $8 billion dollars in fiscal year 2025. Although contracts are periodically renewed, existing providers are deeply entrenched, and bidding processes are rarely truly competitive. But even as the City is totally dependent on the nonprofits, nonprofits often depend on the City for the vast majority of their funding [Garber].
+
+The primary goal of this research project is to describe the city's "human services"

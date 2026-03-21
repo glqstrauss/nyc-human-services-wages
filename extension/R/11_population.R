@@ -15,7 +15,7 @@ source(here::here("extension/R/00_setup.R"))
 acs <- readRDS(file.path(REPLIC_PROC_DIR, "acs_prepared.rds"))
 
 # TODO: move this to acs_prep!
-acs <- acs |> as_survey_rep(
+svy <- acs |> as_survey_rep(
   weights = PERWT,
   repweights = matches("REPWTP[0-9]+"),
   type = "ACS",
@@ -33,7 +33,7 @@ acs <- acs |> as_survey_rep(
 # We should also determine how to flag any cells that are too small to use.
 
 # All NYC workers in the sample (for reference)
-table111_all_workers <- acs |>
+table111_all_workers <- svy |>
   group_by(sector) |>
   summarize(
     obs = unweighted(n()),
@@ -41,7 +41,7 @@ table111_all_workers <- acs |>
   )
 
 # All workers in the sample in social assistance industries
-table111_hs_industry <- acs |>
+table111_hs_industry <- svy |>
   filter(
     (is_city_wkr | is_priv_np_wkr | is_priv_fp_wkr),
     is_hs_industry
@@ -52,7 +52,7 @@ table111_hs_industry <- acs |>
     obs = unweighted(n())
   )
 
-table111_hs_occs <- acs |>
+table111_hs_occs <- svy |>
   filter(
     (is_city_wkr | is_priv_np_wkr | is_priv_fp_wkr),
     is_hs_industry,
@@ -74,7 +74,7 @@ table111_hs_occs <- acs |>
 # what share of workers in each sector are in core social assistance occupations
 # vs other occupations.
 
-table112_core_occs_by_sector <- acs |>
+table112_core_occs_by_sector <- svy |>
   filter(
     (is_city_wkr | is_priv_np_wkr | is_priv_fp_wkr),
     is_hs_industry,
@@ -84,17 +84,17 @@ table112_core_occs_by_sector <- acs |>
   ) |>
   group_by(sector, occ_group) |>
   summarize(
-    n = survey_total(vartype = NULL),
+    n = survey_total(),
     obs = unweighted(n())
   ) |>
+  mutate(cv = n_se / n) |>
   filter(obs >= 40) |>
-  select(sector, occ_group, n) |>
+  select(sector, occ_group, n, n_se, cv, obs) |>
   pivot_wider(
     names_from = sector,
-    values_from = c(n),
-    values_fill = NA_integer_
-  ) |>
-  arrange(occ_group)
+    values_from = c(n, n_se, cv, obs),
+    values_fill = NA
+  )
 
 # 1.1.3
 # title: Non-"core social assistance" occupations of nonprofit vs public sector
@@ -104,7 +104,7 @@ table112_core_occs_by_sector <- acs |>
 # analysis: these are interesting but we lack sufficient observations for most
 # occupations.
 
-table113_other_occs <- acs |>
+table113_other_occs <- svy |>
   filter(
     (is_city_wkr | is_priv_np_wkr | is_priv_fp_wkr),
     is_hs_industry,
@@ -112,22 +112,24 @@ table113_other_occs <- acs |>
   ) |>
   group_by(sector, occ_name, OCC) |>
   summarize(
-    n = survey_total(vartype = NULL),
+    n = survey_total(),
     obs = unweighted(n())
   )
 
-table113_other_occs_non_prof_top_10 <- table113_other_occs |>
+# obs too small to use!
+table113_other_occs_np_t10 <- table113_other_occs |>
   filter(sector == "priv_nonprofit") |>
   ungroup() |>
   arrange(desc(n)) |>
-  select(occ_name, n, obs) |>
+  select(occ_name, OCC, n, obs) |>
   slice_head(n = 20)
 
-table113_other_occs_govt_top_10 <- table113_other_occs |>
+# obs too small to use!
+table113_other_occs_govt_t10 <- table113_other_occs |>
   filter(sector == "govt") |>
   ungroup() |>
   arrange(desc(n)) |>
-  select(occ_name, n, obs) |>
+  select(occ_name, OCC, n, obs) |>
   slice_head(n = 20)
 
 
@@ -137,7 +139,7 @@ table113_other_occs_govt_top_10 <- table113_other_occs |>
 # description: This should show the share for both the industry definition and the core
 # occupations definition. It's probably going to be negligble for public sector...
 
-table114_pct_fulltime <- acs |>
+table114_pct_fulltime <- svy |>
   filter(
     (is_city_wkr | is_priv_np_wkr),
     is_hs_industry,
@@ -152,12 +154,32 @@ table114_pct_fulltime <- acs |>
 
 
 # 1.1.5
+# title: Part time worker stats
+
+
+svy |>
+  filter(
+    (is_city_wkr | is_priv_np_wkr),
+    is_hs_industry,
+    is_hs_occ,
+    occ_group != "homecare",
+    !full_time
+  ) |>
+  group_by(sector) |>
+  summarize(
+    n = survey_total(vartype = "ci"),
+    obs = unweighted(n()),
+    median_hrs_worked = matrixStats::weightedMedian(UHRSWORK, weights = PERWT),
+    avg_hrs_worked = survey_mean(UHRSWORK)
+  )
+
+# 1.1.6
 # title: Percent of hours worked by part-time employees in nonprofit vs public sector
 # description: Shows the share of hours workers by part-time employees in both sectors
 # ("intensity") of
 
 # table of percent total hours worked by part time employees, by sector
-table114_part_time_contrib <- acs |>
+table114_part_time_contrib <- svy |>
   filter(
     (is_city_wkr | is_priv_np_wkr),
     is_hs_industry,
@@ -175,6 +197,8 @@ table114_part_time_contrib <- acs |>
       vartype = "ci"
     )
   )
+
+
 
 # There may be other tables that arise to answer specific questions as they come up!
 # For instance I previously noticed that there are tons of "managers" in the nonprofit
