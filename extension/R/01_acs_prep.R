@@ -4,7 +4,58 @@
 #
 # Run time: ~2-3 min (reading compressed .dat.gz)
 
-source(here::here("replication/R/00_setup.R"))
+source(here::here("extension/R/00_setup.R"))
+
+ANALYSIS_YEAR <- 2022L
+IPUMS_DDI <- file.path(RAW_DIR, "ipums", "usa_00007.xml")
+IPUMS_DAT <- file.path(RAW_DIR, "ipums", "usa_00007.dat.gz")
+INDNAICS_XWALK <- file.path(
+  RAW_DIR, "ipums", "indnaics_crosswalk_2000_onward_with_code_descriptions.csv"
+)
+
+# ── OCC codes (2018 Census occupation codes) ─────────────────────────────────
+# Source: 2018 Census Occupation Code List (Census Bureau)
+
+# Core human services professional occupations (KEEP)
+OCC_COUNSELORS <- c(
+  2001L, # Substance abuse and behavioral disorder counselors
+  2002L, # Educational, guidance, and career counselors and advisors
+  2003L, # Marriage and family therapists
+  2004L, # Mental health counselors
+  2005L, # Rehabilitation counselors
+  2006L # Counselors, all other
+)
+
+OCC_SOCIAL_WORKERS <- c(
+  2011L, # Child, family, and school social workers
+  2012L, # Healthcare social workers
+  2013L, # Mental health and substance abuse social workers
+  2014L # Social workers, all other
+)
+
+OCC_HS_ASSISTANTS <- c(
+  2016L, # Social and human service assistants
+  2025L # Other community and social service specialists
+)
+
+OCC_MANAGERS <- c(
+  420L # Social and community service managers (= Census code 0420)
+)
+
+# Non-professional reference occupations (used in Figures 12-13 as benchmarks)
+OCC_ADMIN_SUPPORT <- c(5740L, 5860L, 5940L) # secretaries, office clerks, admin support
+OCC_JANITORS <- c(4220L) # janitors and building cleaners
+# Security guards: look up separately -- likely ~3600 range or 3930
+
+
+OCC_HOMECARE <- c(
+  3601L, # Home health aides
+  3602L, # Personal care aides
+  3603L # Nursing assistants
+)
+
+# ACS INCWAGE top-code: 999999. Exclude from wage analysis.
+INCWAGE_TOPCODE <- 999999L
 
 # ── Load IPUMS extract ─────────────────────────────────────────────────────
 
@@ -22,7 +73,7 @@ d <- raw |>
   filter(
     STATEFIP == 36L, # New York State
     COUNTYFIP %in% c(5, 47, 61, 81, 85), # Bronx, Kings, New York, Queens, Richmond
-    YEAR == 2022, # Data extract includes multiple surveys.
+    YEAR == ANALYSIS_YEAR, # Data extract includes multiple surveys.
     EMPSTAT == 1L, # employed last week
     GQ %in% 1:2 # exclude group quarters (prisons, dorms)
   )
@@ -157,24 +208,6 @@ d <- d |> mutate(
   parrott_hs_wages = parrott_hs & occ_group != "homecare"
 )
 
-message(paste(
-  "Core HS nonprofit (parrott_hs):",
-  format(sum(d$parrott_hs), big.mark = ","), "unweighted,",
-  format(round(sum(d$PERWT[d$parrott_hs])), big.mark = ","), "weighted."
-))
-message(paste(
-  "  Wage-eligible (parrott_hs_wages, excl. homecare):",
-  format(sum(d$parrott_hs_wages), big.mark = ","), "unweighted.",
-  format(round(sum(d$PERWT[d$parrott_hs_wages])), big.mark = ","), "weighted."
-))
-
-# Flag private hospitals (comparison group for occupation-level tables)
-# 621M: ACS PUMS merged hospital code (covers NAICS 6221?)
-d <- d |>
-  mutate(
-    priv_hosp = INDNAICS == "621M" & sector == "priv_forprofit"
-  )
-
 # ── Education category ─────────────────────────────────────────────────────--
 # EDUC general variable codes (see 00_setup.R for full codebook)
 
@@ -196,7 +229,6 @@ d <- d |>
 # ── Imputed experience ─────────────────────────────────────────────────────--
 
 # https://economics.stackexchange.com/questions/53650
-# Added
 
 d <- d |>
   mutate(
@@ -261,10 +293,13 @@ d <- d |>
 # ── 10. Analysis Sector Flags ───────────────────────────────────────────
 
 d <- d |> mutate(
-  is_city_wkr = CLASSWKRD == 28L, # Local Government sector
-  is_priv_fp_wkr = sector == "priv_forprofit",
-  is_priv_np_wkr = sector == "priv_nonprofit",
-  # for govt-level breakdown justifying restriction to city workers...
+  # baseline/alt baseline
+  is_private_wkr = sector %in% c("priv_forprofit", "priv_nonprofit"),
+  is_govt_wkr = sector == "govt",
+  is_city_wkr = CLASSWKRD == 28L,
+  is_forprofit_wkr = sector == "priv_forprofit",
+  is_nonprofit_wkr = sector == "priv_nonprofit",
+  # for govt-level breakdown showing dominance of local govt
   govt_level = case_when(
     CLASSWKRD == 25L ~ "federal",
     CLASSWKRD == 27L ~ "state",
@@ -273,23 +308,7 @@ d <- d |> mutate(
   )
 )
 
-# ── 11. Unweighted cell-size check ───────────────────────────────────────────
-
-check_cells <- d |>
-  filter(parrott_hs, full_time) |>
-  summarize(n_unweighted = n(), n_weighted = sum(PERWT), .by = educ_cat)
-message("Core HS nonprofit full-time workers by education (unweighted):")
-print(check_cells)
-
-check_occ <- d |>
-  filter(parrott_hs, full_time) |>
-  summarize(n_unweighted = n(), n_weighted = sum(PERWT), .by = occ_group) |>
-  arrange(desc(n_unweighted))
-message("Core HS nonprofit full-time workers by occupation group (unweighted):")
-print(check_occ)
-
 # ── Three-way analysis sector variable ────────────────────────────────────
-# Clean classification for all downstream demographic and wage tables:
 #   "hs_nonprofit"   = core human services nonprofit workers
 #   "govt"           = all government workers
 #   "priv_forprofit" = all private for-profit workers (any industry)
@@ -313,17 +332,6 @@ d <- d |>
       TRUE ~ NA_character_
     ) |> factor(levels = c("hs_nonprofit", "govt", "priv_forprofit"))
   )
-
-message("parrott_analysis_sector distribution:")
-print(
-  d |>
-    group_by(parrott_analysis_sector) |>
-    summarize(n_unweighted = n(), n_weighted = sum(PERWT))
-)
-
-# ── Extension analysis groups ─────────────────────────────────────────────────────
-
-# TODO should categorize these up front once initial round of analysis is done...
 
 # ── INDNAICS crosswalk ─────────────────────────────────────────────────────
 # Loads the IPUMS-provided crosswalk CSV, which covers all Census/ACS-specific

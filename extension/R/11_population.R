@@ -10,9 +10,8 @@
 
 source(here::here("extension/R/00_setup.R"))
 
-acs <- readRDS(file.path(REPLIC_PROC_DIR, "acs_prepared.rds"))
+acs <- readRDS(file.path(PROC_DIR, "acs_prepared.rds"))
 
-# TODO: move this to acs_prep!
 svy <- acs |> as_survey_rep(
   weights = PERWT,
   repweights = matches("REPWTP[0-9]+"),
@@ -20,111 +19,91 @@ svy <- acs |> as_survey_rep(
   mse = TRUE
 )
 
-# 1.1.1
-# title: How large are the sectors of interest?
-# description: This table should include weighted and unweighted counts of workers in
-# each sector of interest. For both non-profit and city workers, we should see:
-#   - All workers
-#   - Workers in social assistance industries
-#   - Workers in "core social assistance occupations"
-# NB: these should perhaps be three different tables?
-# We should also determine how to flag any cells that are too small to use.
+# POPULATION --------------------------------------------------------------------------
 
-table111_sector_sizes <- svy |>
-  filter(is_city_wkr | is_priv_np_wkr | is_priv_fp_wkr) |>
+# How large is the workforce in NYC?
+svy |>
   group_by(sector) |>
-  summarize(
-    # all workers in sample
-    n_all = survey_total(),
-    obs_all = unweighted(n()),
-    # workers in hs industry only
-    n_hs_industry = survey_total(is_hs_industry),
-    obs_hs_industry = unweighted(sum(is_hs_industry)),
-    # workers in hs industry + core occs only (no homecare)
-    n_hs_occs = survey_total(is_hs_industry & is_hs_occ_nh),
-    obs_hs_occs = unweighted(sum(is_hs_industry & is_hs_occ_nh))
-  )
+  summarize(n = survey_total(), obs = unweighted(n()))
+
+# How large is the human services industry in NYC?
+svy |>
+  filter(is_hs_industry) |>
+  group_by(sector) |>
+  summarize(n = survey_total(), obs = unweighted(n()))
+
+# Now let's ignore self-employed and NA...
+svy <- svy |> filter(!is.na(sector), sector != "self_employed")
 
 
-# 1.1.2
-# title: Size of municipal vs state vs federal government workforces in NYC, 2018/22
-# description: This table shows the counts of workers in each level of government in
-# the sample, for all workers, for hs industry, and for hs core occs.
-# analysis: NYC Municipal govt is by *far* the largest group.
+# How large is the "core occupations" (with home healthcare) definition of human services workers in NYC?
+svy |>
+  filter(is_hs_industry, is_hs_occ) |>
+  group_by(sector) |>
+  summarize(n = survey_total(), obs = unweighted(n()))
 
-table112_govt_levels <- svy |>
-  filter(sector == "govt") |>
+# How large is the "core occupations" definition of human services workers in NYC?
+svy |>
+  filter(is_hs_industry, is_hs_occ_nh) |>
+  group_by(sector) |>
+  summarize(n = survey_total(), obs = unweighted(n()))
+
+# How much of the govt hs industry is made up of city workers?
+svy |>
+  filter(is_govt_wkr, is_hs_industry) |>
   group_by(govt_level) |>
-  summarize(
-    n_all = survey_total(),
-    obs_all = unweighted(n()),
-    n_hs_industry = survey_total(is_hs_industry),
-    obs_hs_industry = unweighted(sum(is_hs_industry)),
-    n_hs_occs = survey_total(is_hs_industry & is_hs_occ_nh),
-    obs_hs_occs = unweighted(sum(is_hs_industry & is_hs_occ_nh))
-  )
+  summarize(n = survey_total(), obs = unweighted(n()))
 
-# 1.1.4
-# title: Full-time vs part-time status of nonprofit vs public sector social assistance
-# workers 2018/22
-# description: This should show the share for both the industry definition and the core
-# occupations definition. It's probably going to be negligble for public sector...
+# How much of the govt hs core occs is made up of city workers?
+svy |>
+  filter(is_govt_wkr, is_hs_industry, is_hs_occ_nh) |>
+  group_by(govt_level) |>
+  summarize(n = survey_total(), obs = unweighted(n()))
 
-# NB: this diff gets even more dramatic with the core occs, but the CV is too high for govt.
-# We can get a lower CV for "all hs_industry except homecare specifically", but that's
-# not part of our population for other parts of the survey...
-# table114_pct_parttime <-
+# HOURS -------------------------------------------------------------------------------
+
+# What percentage of workers in hs_industry are full-time, by sector?
+# Note: we don't directly observe part-time because of insufficient obs for govt.
 svy |>
   filter(
-    (is_city_wkr | is_priv_np_wkr),
+    (is_city_wkr | is_nonprofit_wkr),
+    full_time | part_time,
+    is_hs_industry
+  ) |>
+  group_by(sector) |>
+  summarize(
+    pct_ft = survey_mean(full_time),
+    obs = unweighted(n())
+  )
+
+# What percentage of workers in hs_occ_nh are full time, by sector?
+svy |>
+  filter(
+    (is_city_wkr | is_nonprofit_wkr),
     full_time | part_time,
     is_hs_industry,
     is_hs_occ_nh
   ) |>
   group_by(sector) |>
   summarize(
-    pct_pt = survey_mean(part_time, vartype = "cv")
+    pct_ft = survey_mean(full_time, vartype = "cv"),
+    obs = unweighted(n())
   )
 
-# 1.1.5
-# title: Part time worker stats
-
-
-# NOTE pair this with the density plot of part time hours by sector.
-# The govt CV is too small to say anything definitive about but it doesnt hurt.
+# What is the distribution of hours worked for full-time workers in hs_industry, by sector?
 svy |>
   filter(
-    (is_city_wkr | is_priv_np_wkr),
+    (is_city_wkr | is_nonprofit_wkr),
     is_hs_industry,
     is_hs_occ_nh,
-    part_time
+    full_time
   ) |>
   group_by(sector) |>
   summarize(
-    avg_hrs_worked = survey_mean(UHRSWORK, vartype = "cv")
-  )
-
-# 1.1.6
-# title: Percent of hours worked by part-time employees in nonprofit vs public sector
-# description: Shows the share of hours workers by part-time employees in both sectors
-# ("intensity") of
-
-# table of percent total hours worked by part time employees, by sector
-table114_part_time_contrib <-
-  svy |>
-  filter(
-    (is_city_wkr | is_priv_np_wkr),
-    is_hs_industry,
-    is_hs_occ_nh,
-    part_time | full_time
-  ) |>
-  group_by(sector) |>
-  summarize(
-    pct_hrs_part_time = survey_ratio(
-      # part timer hours
-      numerator = if_else(full_time, 0, UHRSWORK),
-      # all hours
-      denominator = UHRSWORK,
-      vartype = "cv"
-    )
+    avg_hrs_worked = survey_mean(UHRSWORK),
+    # quantiles using svyby
+    hrs_25 = Hmisc::wtd.quantile(UHRSWORK, weights = cur_svy_wts(), probs = 0.25),
+    hrs_50 = Hmisc::wtd.quantile(UHRSWORK, weights = cur_svy_wts(), probs = 0.5),
+    hrs_75 = Hmisc::wtd.quantile(UHRSWORK, weights = cur_svy_wts(), probs = 0.75),
+    obs = unweighted(n())
   )

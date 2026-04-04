@@ -49,6 +49,10 @@ svy <- acs |>
 # We could also consider producing TWO versions: one for industry and one for "core
 # occupations" only.
 
+# What percent of workers in hs_industry are women?
+
+svy``
+
 table121_pct_women_poc <- svy |>
   filter(ind_analysis) |>
   group_by(sector) |>
@@ -149,4 +153,23 @@ table123_experience_high_ed_ind <- svy |>
   pivot_wider(
     names_from = sector,
     values_from = c(avg_exp, avg_exp_se, n, n_se, obs)
+  )
+
+
+table123_experience_high_ed_social_workers <- svy |>
+  filter(
+    ind_analysis,
+    educ_cat %in% c("bachelors", "postgrad"),
+  ) |>
+  group_by(sector, occ_group) |>
+  summarize_experience() |>
+  pivot_wider(
+    names_from = sector,
+    values_from = c(avg_exp, avg_exp_se, n, n_se, obs)
+  ) |>
+  mutate(
+    t_stat = (
+      (avg_exp_govt - avg_exp_priv_nonprofit) /
+        sqrt(avg_exp_se_govt^2 + avg_exp_se_priv_nonprofit^2)
+    )
   )

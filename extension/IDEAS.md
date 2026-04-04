@@ -25,3 +25,16 @@ Lastly, I should really start on the "Policy Background" section of the paper, a
 - [ ] We should produce a chart to look at just the top of the distribution.
 
 ￼
+
+# March 21 2026
+
+- Mostly done with the ACS analysis, only part left is to replicate the wage data from Parrott. This is actually mostly done in wages_old.R, we just need to clean it up and make sure it is using our up to date sample definitions...
+- Turns out using CPS for longitudinal analysis is a non-starter, because CPS CLASSWORKD does not distinguish non-profit/for-profit....
+
+# March 24 2026
+
+Three todos:
+
+1. Update with 2024 ACS 5-Year!
+2. We can still do longitudinal with ACS and we will!
+3. We should add private sector (all) back in as comparator for some of our tables, instead of private sector filtered to specific OCCs/INDUSTRIES which is not that useful.
