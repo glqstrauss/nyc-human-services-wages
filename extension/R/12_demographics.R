@@ -13,7 +13,7 @@
 
 source(here::here("extension/R/00_setup.R"))
 
-acs <- readRDS(file.path(REPLIC_PROC_DIR, "acs_prepared.rds"))
+acs <- readRDS(file.path(PROC_DIR, "acs_prepared.rds"))
 
 svy <- acs |>
   as_survey_rep(
@@ -22,154 +22,168 @@ svy <- acs |>
     type = "ACS",
     mse = TRUE
   ) |>
-  mutate(
-    # hs_industry city and nonprofit workers
-    # plus all private sector workers as baseline
-    ind_analysis = (is_hs_industry & is_city_wkr) |
-      (is_hs_industry & is_priv_np_wkr) |
-      (is_priv_fp_wkr),
-    # hs_occ city and nonprofit workers
-    # plus all private sector workers as baseline
-    # For city, we do NOT require that they be in the industry,
-    # since civil service titles dictate pay standards across
-    # "industry" for city workers and the sample is too small
-    # to subset down to just those in the industry.
-    occ_analysis = (is_hs_industry & is_hs_occ & is_city_wkr) |
-      (is_hs_industry & is_hs_occ & is_priv_np_wkr) |
-      (is_priv_fp_wkr)
-  )
 
-# 1.2.1
-# title: Gender and race/ethnic characteristics of public vs nonprofit core human
-# service workers, 2018/22
-# description: This is similar to Parrott's Figure 5 (2025) but with the public sector
-# as the comparison group instead of the private sector as a whole. We should also
-# add percentages to the table in order to more easily compare across the two groups.
-# These are what Parrott uses in Figure 6 (which is a bar chart not a table).
-# We could also consider producing TWO versions: one for industry and one for "core
-# occupations" only.
-
-# What percent of workers in hs_industry are women?
-
-svy``
-
-table121_pct_women_poc <- svy |>
-  filter(ind_analysis) |>
+# What percent of workers in is_hs_industry are women and/or people of color?
+svy |>
+  filter(is_city_wkr | is_nonprofit_wkr, is_hs_industry) |>
   group_by(sector) |>
   summarize(
-    pct_women = survey_mean(female, vartype = "cv"),
-    pct_poc = survey_mean(poc, vartype = "cv"),
-    n = survey_total(),
+    pct_women = survey_mean(female),
+    pct_poc = survey_mean(poc),
     obs = unweighted(n())
   )
 
-table121_pct_gender_x_race <- svy |>
-  filter(ind_analysis) |>
+# What percent of workers in is_hs_occ are women and/or POC?
+svy |>
+  filter(is_city_wkr | is_nonprofit_wkr, is_hs_industry, is_hs_occ) |>
+  group_by(sector) |>
+  summarize(
+    pct_women = survey_mean(female),
+    pct_poc = survey_mean(poc),
+    obs = unweighted(n())
+  )
+
+# What percent of the private sector vs govt workforce more broadly is women and/or POC?
+svy |>
+  filter(is_private_wkr | is_govt_wkr) |>
+  mutate(sector=if_else(is_private_wkr, "private", "govt")) |>
+  group_by(sector) |>
+  summarize(
+    pct_women = survey_mean(female),
+    pct_poc = survey_mean(poc),
+    obs = unweighted(n())
+  )
+
+# What percent of workers in is_hs_industry are women x POC (crosstab)?
+svy |>
+  filter(is_city_wkr | is_nonprofit_wkr, is_hs_industry) |>
   group_by(sector, gender_race) |>
   summarize(
-    prop = survey_prop(vartype = "cv")
+    prop = survey_prop()
   ) |>
   pivot_wider(
     names_from = sector,
-    values_from = c(prop, prop_cv)
+    values_from = c(prop, prop_se)
   )
 
-# 1.2.2
-# title: Education levels of public vs nonprofit core human service workers, 2018/22
-# description: This is similar to Parrott's Figure 7 (2025) but comparing public vs
-# nonprofit. Produce versions for core occupations and industry-wide definitions.
-# analysis: city workers on average are more experienced (older) but similarly likely to
-# have a college degree. This says something about the pay gap, and perhaps says
-# something about working conditions and turnover as well.
+# EDUCATION AND EXPERIENCE ------------------------------------------------------------
 
-table122_pct_educ_cat_industry <- svy |>
-  filter(ind_analysis) |>
+# What percent of workers in is_hs_industry have each level of education?
+svy |>
+  filter(is_city_wkr | is_nonprofit_wkr, is_hs_industry) |>
   group_by(sector, educ_cat) |>
   summarize(
-    prop = survey_prop(vartype = "cv"),
+    prop = survey_prop(),
   ) |>
   pivot_wider(
     names_from = sector,
-    values_from = c(prop, prop_cv)
+    values_from = c(prop, prop_se)
   )
 
-# Robust to using the core occupations definition -- still large gaps for postgrad and college
-table122_pct_educ_cat_occ <- svy |>
-  filter(occ_analysis) |>
+# What percent of workers in is_hs_occ have each level of education?
+svy |>
+  filter(is_city_wkr | is_nonprofit_wkr, is_hs_industry, is_hs_occ) |>
   group_by(sector, educ_cat) |>
   summarize(
-    prop = survey_prop(vartype = "cv")
+    prop = survey_prop()
   ) |>
   pivot_wider(
     names_from = sector,
-    values_from = c(prop, prop_cv)
+    values_from = c(prop, prop_se)
   )
 
-# 1.2.3
-# title: Years of experience in public vs nonprofit core human service workers, 2018/22
-# description: compares imputed experience (age - imputed workforce entry age). Produce
-# versions for core occupations and industry-wide definitions. We should probably
-# bucket experience into categories (0-5 years, 5-10 years, 10-20 years, 20+ years).
-# TODO: we need to add imputed experience to the ACS prep. See the following discussion:
+# What is the median age of workers in is_hs_occ, by sector?
+svy |>
+  filter(is_city_wkr | is_nonprofit_wkr, is_hs_industry, is_hs_occ) |>
+  group_by(sector) |>
+  summarize(
+    age_median = Hmisc::wtd.quantile(AGE, weights = cur_svy_wts(), probs = 0.5)
+  )
+
+
+# Following calculations use measure of experience as age minus estimated age of
+# workforce entry, based on level of education
 # https://economics.stackexchange.com/questions/53650
 
-summarize_experience <- \(x) summarize(
-  x,
-  avg_exp = survey_mean(experience),
-  n = survey_total(),
-  obs = unweighted(n())
-)
+# What is the average experience of workers in is_hs_industry, by sector?
+svy |>
+  filter(is_city_wkr | is_nonprofit_wkr, is_hs_industry) |>
+  group_by(sector) |>
+  summarize(
+    avg_exp = survey_mean(experience),
+    obs = unweighted(n())
+  )
 
+# What is the average experience of workers in is_hs_occ, by sector?
+svy |>
+  filter(is_city_wkr | is_nonprofit_wkr, is_hs_industry, is_hs_occ) |>
+  group_by(sector) |>
+  summarize(
+    avg_exp = survey_mean(experience),
+    obs = unweighted(n())
+  )
+
+# What is the average experience in the private sector?
+svy |>
+  filter(is_private_wkr) |>
+  summarize(
+    avg_exp = survey_mean(experience),
+    obs = unweighted(n())
+  )
+
+# What is the average experience for is_hs_occ, by sector and education level?
 table123_experience_occ <- bind_rows(
   svy |>
-    filter(occ_analysis) |>
+    filter(is_city_wkr | is_nonprofit_wkr, is_hs_industry, is_hs_occ) |>
     group_by(sector, educ_cat) |>
-    summarize_experience(),
+    summarize(
+      avg_exp = survey_mean(experience),
+      obs = unweighted(n())
+    ),
   svy |>
-    filter(occ_analysis) |>
+    filter(is_city_wkr | is_nonprofit_wkr, is_hs_industry, is_hs_occ) |>
     group_by(sector) |>
-    summarize_experience() |>
+    summarize(
+      avg_exp = survey_mean(experience),
+      obs = unweighted(n())
+    ) |>
     mutate(educ_cat = "all")
 ) |> pivot_wider(
   names_from = sector,
-  values_from = c(avg_exp, avg_exp_se, n, n_se, obs)
+  values_from = c(avg_exp, avg_exp_se, obs)
 )
 
-# KEY FINDING: the experience gap is 5-6 years among highly-educated workers
-table123_experience_high_ed_occ <- svy |>
-  filter(occ_analysis, educ_cat %in% c("bachelors", "postgrad")) |>
-  group_by(sector) |>
-  summarize_experience() |>
-  pivot_wider(
-    names_from = sector,
-    values_from = c(avg_exp, avg_exp_se, n, n_se, obs)
-  )
-
-# Robust to using the industry definition, though the gap is slightly smaller.
-table123_experience_high_ed_ind <- svy |>
-  filter(ind_analysis, educ_cat %in% c("bachelors", "postgrad")) |>
-  group_by(sector) |>
-  summarize_experience() |>
-  pivot_wider(
-    names_from = sector,
-    values_from = c(avg_exp, avg_exp_se, n, n_se, obs)
-  )
-
-
-table123_experience_high_ed_social_workers <- svy |>
+# What is the average experience for is_hs_occ, looking only at highly educated workers?
+svy |>
   filter(
-    ind_analysis,
+    is_city_wkr | is_nonprofit_wkr, 
+    is_hs_industry, 
+    is_hs_occ, 
     educ_cat %in% c("bachelors", "postgrad"),
   ) |>
-  group_by(sector, occ_group) |>
-  summarize_experience() |>
+  group_by(sector) |>
+  summarize(
+      avg_exp = survey_mean(experience),
+      obs = unweighted(n())
+  ) |>
   pivot_wider(
     names_from = sector,
-    values_from = c(avg_exp, avg_exp_se, n, n_se, obs)
+    values_from = c(avg_exp, avg_exp_se, obs)
+  )
+
+# What is the average experience for is_hs_industry, looking only at highly educated workers?
+svy |>
+  filter(
+    is_city_wkr | is_nonprofit_wkr, 
+    is_hs_industry,
+    educ_cat %in% c("bachelors", "postgrad"),
   ) |>
-  mutate(
-    t_stat = (
-      (avg_exp_govt - avg_exp_priv_nonprofit) /
-        sqrt(avg_exp_se_govt^2 + avg_exp_se_priv_nonprofit^2)
-    )
+  group_by(sector) |>
+  summarize(
+      avg_exp = survey_mean(experience),
+      obs = unweighted(n())
+  ) |>
+  pivot_wider(
+    names_from = sector,
+    values_from = c(avg_exp, avg_exp_se, obs)
   )
