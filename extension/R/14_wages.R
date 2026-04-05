@@ -139,9 +139,13 @@ sub <- svy |>
   )
 
 # What is the median wage for this group at each experience_cat level, by sector?
+# As a dodged column chart
 sub |>
   group_by(sector, experience_cat) |>
-  summarize(mean_wage = survey_mean(INCWAGE, vartype = NULL))
+  summarize(median_wage = survey_median(INCWAGE, vartype = NULL)) |>
+  ggplot(aes(x = experience_cat, y = median_wage, fill = sector)) +
+  geom_col(position = "dodge") +
+  theme_minimal()
 
 # Scatterplot of exp vs log wage, by sector
 sub |>
