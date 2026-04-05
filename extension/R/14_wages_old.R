@@ -6,7 +6,7 @@
 
 source(here::here("extension/R/00_setup.R"))
 
-acs <- readRDS(file.path(REPLIC_PROC_DIR, "acs_prepared.rds"))
+acs <- readRDS(file.path(PROC_DIR, "acs_prepared.rds"))
 
 ######################################
 # Questions:

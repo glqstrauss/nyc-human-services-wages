@@ -155,7 +155,8 @@ d <- d |>
       TRUE ~ NA_character_
     ) |> factor(),
     is_hs_occ = !is.na(occ_group),
-    is_hs_occ_nh = !is.na(occ_group) & occ_group != "homecare"
+    is_hs_occ_nh = !is.na(occ_group) & occ_group != "homecare",
+    is_homecare = ifelse(!is.na(occ_group) & occ_group == "homecare", TRUE, FALSE)
   )
 
 d <- d |>

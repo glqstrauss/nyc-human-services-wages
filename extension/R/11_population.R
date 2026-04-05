@@ -101,7 +101,6 @@ svy |>
   group_by(sector) |>
   summarize(
     avg_hrs_worked = survey_mean(UHRSWORK),
-    # quantiles using svyby
     hrs_25 = Hmisc::wtd.quantile(UHRSWORK, weights = cur_svy_wts(), probs = 0.25),
     hrs_50 = Hmisc::wtd.quantile(UHRSWORK, weights = cur_svy_wts(), probs = 0.5),
     hrs_75 = Hmisc::wtd.quantile(UHRSWORK, weights = cur_svy_wts(), probs = 0.75),
