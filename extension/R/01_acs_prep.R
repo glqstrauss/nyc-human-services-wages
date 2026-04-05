@@ -15,6 +15,7 @@ INDNAICS_XWALK <- file.path(
 
 # ── OCC codes (2018 Census occupation codes) ─────────────────────────────────
 # Source: 2018 Census Occupation Code List (Census Bureau)
+# https://www.bls.gov/ooh/
 
 # Core human services professional occupations (KEEP)
 OCC_COUNSELORS <- c(
@@ -39,15 +40,28 @@ OCC_HS_ASSISTANTS <- c(
 )
 
 OCC_MANAGERS <- c(
-  420L # Social and community service managers (= Census code 0420)
+  420L # Social and community service managers
 )
 
 # Non-professional reference occupations (used in Figures 12-13 as benchmarks)
+# These are tricky because they are non HS-specific, and so they only make
+# sense to include when we are filtering to specific industries.
 OCC_ADMIN_SUPPORT <- c(5740L, 5860L, 5940L) # secretaries, office clerks, admin support
-OCC_JANITORS <- c(4220L) # janitors and building cleaners
-# Security guards: look up separately -- likely ~3600 range or 3930
-
-
+OCC_JANITORS <- c(
+  4200L, # First-Line Supervisors Of Housekeeping And Janitorial Workers
+  4220L, # Janitors and building cleaners
+  4230L # Maids and housekeeping cleaners
+)
+OCC_SECURITY <- c(3930L)
+OCC_FOOD <- c(
+  4000L, # Chefs and head cooks
+  4010L, # First-line supervisors of food preparation and serving workers
+  4020L, # Cooks
+  4030L, # Food preparation workers
+  4120L, # Food servers, nonrestaurant
+  4130L, # Dining room and cafeteria attendants and bartender helpers
+  4140L # Dishwashers
+)
 OCC_HOMECARE <- c(
   3601L, # Home health aides
   3602L, # Personal care aides
@@ -149,7 +163,7 @@ d <- d |>
       OCC %in% OCC_HS_ASSISTANTS ~ "hs_assistants",
       OCC %in% OCC_MANAGERS ~ "managers",
       OCC %in% OCC_ADMIN_SUPPORT ~ "admin_support",
-      OCC %in% OCC_JANITORS ~ "janitors",
+      OCC %in% c(OCC_JANITORS, OCC_FOOD, OCC_SECURITY) ~ "janitors_cooks_guards",
       # homecare will be *excluded* from wage analysis, but not demo analysis
       OCC %in% OCC_HOMECARE ~ "homecare",
       TRUE ~ NA_character_
