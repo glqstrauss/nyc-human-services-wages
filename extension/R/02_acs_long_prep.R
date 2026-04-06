@@ -2,8 +2,8 @@
 
 source(here::here("extension/R/00_setup.R"))
 
-IPUMS_DDI <- file.path(RAW_DIR, "ipums_longitudinal", "usa_00009.xml")
-IPUMS_DAT <- file.path(RAW_DIR, "ipums_longitudinal", "usa_00009.dat.gz")
+IPUMS_DDI_2005_2024 <- file.path(RAW_DIR, "ipums_longitudinal", "usa_00009.xml")
+IPUMS_DDI_2000 <- file.path(RAW_DIR, "ipums_longitudinal", "usa_00010.xml")
 
 # Core human services professional occupations
 OCC_COUNSELORS <- c(2000L)
@@ -23,15 +23,61 @@ OCC_HOMECARE <- c(
   3600L
 )
 
+# CPI-W
+# https://www.ssa.gov/oact/STATS/avgcpi.html
+CPI <- tibble(
+  year = 2000:2024,
+  cpi_u_rs = c(
+    252.5,
+    259.7,
+    263.8,
+    269.8,
+    277.0,
+    286.4,
+    295.7,
+    304.1,
+    315.8,
+    314.7,
+    319.8,
+    330.0,
+    336.9,
+    342.0,
+    347.7,
+    348.3,
+    352.8,
+    360.3,
+    369.1,
+    375.8,
+    380.8,
+    399.2,
+    431.5,
+    449.3,
+    462.5
+  )
+)
+
+CPI_2024 <- CPI$cpi_u_rs[CPI$year == 2024]
+
 # ── Load IPUMS extract ─────────────────────────────────────────────────────
 
-message("Reading IPUMS DDI...")
-ddi <- read_ipums_ddi(IPUMS_DDI)
+message("Reading IPUMS DDI for 1-year extracts...")
+ddi <- read_ipums_ddi(IPUMS_DDI_2005_2024)
 
-message("Reading microdata...")
+message("Reading microdata for 1-year extracts...")
 raw <- read_ipums_micro(ddi, verbose = FALSE)
 
 message(paste("Loaded", format(nrow(raw), big.mark = ","), "rows total."))
+
+message("Reading IPUMS DDI for 2000 5% census...")
+ddi_y2k <- read_ipums_ddi(IPUMS_DDI_2000)
+
+message("Reading microdata for 2000 5% census...")
+raw_y2k <- read_ipums_micro(ddi_y2k, verbose = FALSE)
+
+message(paste("Loaded", format(nrow(raw_y2k), big.mark = ","), "rows total."))
+
+raw <- bind_rows(raw, raw_y2k)
+message(paste("Combined dataset has", format(nrow(raw), big.mark = ","), "rows total."))
 
 # ── Filter to NYC, 2018-2022 sample, employed civilians ───────────────────
 
@@ -88,7 +134,7 @@ d |>
 # Validate that the industry codes are consistent with expected counts in the longitudinal extract.
 d |>
   filter(
-    grepl("^62[34]", INDNAICS),
+    grepl("^624", INDNAICS),
     INDNAICS != "6244", # exclude childcare
     sector %in% c("priv_nonprofit", "govt")
   ) |>
@@ -100,19 +146,17 @@ d |>
 d <- d |>
   mutate(
     # Social Assistance (624*) + Residential Care (623*)  - Childcare (6244)
-    is_hs_industry = grepl("^62[34]", INDNAICS) &
+    is_sa_industry = grepl("^624", INDNAICS) &
       INDNAICS != 6244,
     occ_group = case_when(
       OCC2010 %in% OCC_SOCIAL_WORKERS ~ "social_workers",
       OCC2010 %in% OCC_COUNSELORS ~ "counselors",
       OCC2010 %in% OCC_HS_ASSISTANTS ~ "hs_assistants",
       OCC2010 %in% OCC_MANAGERS ~ "managers",
-      # homecare will be *excluded* from wage analysis, but not demo analysis
-      OCC2010 %in% OCC_HOMECARE ~ "homecare",
       TRUE ~ NA_character_
     ) |> factor(),
     is_hs_occ = !is.na(occ_group),
-    is_hs_occ_nh = !is.na(occ_group) & occ_group != "homecare"
+    is_hs_occ_nh = !is.na(occ_group) & occ_group != "homecare",
   )
 
 # ── Education category ─────────────────────────────────────────────────────--
@@ -193,6 +237,36 @@ d <- d |> mutate(
     TRUE ~ NA_character_
   )
 )
+
+# Adjust wadges for inflation using CPI-W
+
+d <- d |>
+  left_join(CPI, by = c("YEAR" = "year")) |>
+  mutate(
+    incwage_real = INCWAGE * (CPI_2024 / cpi_u_rs)
+  ) |>
+  select(-cpi_u_rs)
+
+# ── 3-year non-overlapping pools (2020 excluded — COVID experimental weights) ──
+# 2024 has no complete 3-year pool; pool is NA and excluded from pooled analyses.
+
+d <- d |>
+  mutate(
+    pool = case_when(
+      YEAR %in% 2005:2007 ~ 2006L,
+      YEAR %in% 2008:2010 ~ 2009L,
+      YEAR %in% 2011:2013 ~ 2012L,
+      YEAR %in% 2014:2016 ~ 2015L,
+      YEAR %in% 2017:2019 ~ 2018L,
+      YEAR %in% 2021:2023 ~ 2022L,
+      TRUE ~ NA_integer_ # 2020 (excluded) and 2024 (incomplete pool)
+    ),
+    across(
+      c(PERWT, matches("REPWTP[0-9]+")),
+      \(w) w / 3,
+      .names = "{.col}_pooled"
+    )
+  )
 
 saveRDS(d, file.path(PROC_DIR, "acs_long_prepared.rds"))
 message(paste("Saved acs_long_prepared.rds (", format(nrow(d), big.mark = ","), "rows)."))
