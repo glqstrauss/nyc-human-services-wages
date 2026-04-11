@@ -30,11 +30,23 @@ svy |>
 svy |>
   filter(is_hs_industry) |>
   group_by(sector) |>
-  summarize(n = survey_total(), obs = unweighted(n()))
+  summarize(
+    n = survey_total(),
+    n_homecare = survey_total(is_homecare),
+    n_rest = survey_total(!is_homecare),
+    obs = unweighted(n())
+  )
 
 # Now let's ignore self-employed and NA...
 svy <- svy |> filter(!is.na(sector), sector != "self_employed")
 
+# What specific industries are largest in each sector?
+svy |>
+  filter(is_hs_industry, !is_homecare) |>
+  group_by(sector, INDNAICS) |>
+  summarize(n = survey_total(), obs = unweighted(n())) |>
+  arrange(sector, desc(n)) |>
+  pivot_wider(names_from = sector, values_from = c(n, n_se, obs))
 
 # How large is the "core occupations" (with home healthcare) definition of human services workers in NYC?
 svy |>

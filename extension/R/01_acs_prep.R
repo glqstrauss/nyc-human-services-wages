@@ -109,6 +109,11 @@ d <- d |>
       CLASSWKRD %in% c(25L, 27L, 28L) ~ "govt",
       TRUE ~ NA_character_ # Capures NA and Unpaid Family Worker
     ) |> factor(),
+    sector_broad = case_when(
+      sector %in% c("priv_forprofit", "priv_nonprofit") ~ "private",
+      sector == "govt" ~ "govt",
+      TRUE ~ NA_character_
+    ) |> factor()
   )
 
 # ── Core human services flag ───────────────────────────────────────────────
@@ -155,7 +160,7 @@ d <- d |>
 d <- d |>
   mutate(
     # Social Assistance (624*) + Residential Care (623*)  - Childcare (6244)
-    is_hs_industry = grepl("^62[34]", INDNAICS) &
+    is_hs_industry = grepl("^62[4]", INDNAICS) &
       INDNAICS != 6244,
     occ_group = case_when(
       OCC %in% OCC_SOCIAL_WORKERS ~ "social_workers",
