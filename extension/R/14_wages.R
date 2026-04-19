@@ -31,52 +31,28 @@ calculate_group_sector_stats <- function(data, group_vars) {
     mutate(med_wage = ifelse(med_wage_cv > 0.3, NA_real_, med_wage))
 }
 
+# what is the overall median pay for all govt vs all private sector?
+svy |>
+  filter(!is.na(sector_broad)) |>
+  calculate_group_sector_stats(sector_broad)
+
 # What is the median pay for full-time workers in non-profit hs industry, vs public
 # sector hs_industry? (A lot closer than the Parrott comparison...)
 svy |>
-  filter(is_city_wkr | is_nonprofit_wkr, is_hs_industry, !is_homecare) |>
-  calculate_group_sector_stats(sector)
+  filter(!is.na(sector_broad), is_hs_industry, !is_homecare) |>
+  calculate_group_sector_stats(sector_broad)
 
-# What is the median pay for full-time workers in is_hs_industry, excluding
-# home healthcare workers, by sector x education, compared to all_public and
-# all_private workers? (Parrott comparison)
+# What is the median pay for full-time workers by education level?
+# A: In all private vs all govt?
+svy |>
+  calculate_group_sector_stats(sector_broad, educ_cat) |>
+  mutate(sector_broad = paste0("all_", sector_broad))
 
-# Calculate groups separately, since the group overlaps with nonprofit sector...
-bind_rows(
-  svy |>
-    filter(is_nonprofit_wkr & is_hs_industry & !is_homecare) |>
-    calculate_group_sector_stats(educ_cat) |>
-    mutate(sector = "hs_nonprofit"),
-  svy |>
-    # Parrott uses all-govt
-    filter(is_govt_wkr) |>
-    calculate_group_sector_stats(educ_cat) |>
-    mutate(sector = "all_public"),
-  svy |>
-    filter(is_private_wkr) |>
-    calculate_group_sector_stats(educ_cat) |>
-    mutate(sector = "all_private")
-) |>
-  arrange(educ_cat, sector)
-
-# Same as above, but by sector-only ("all education levels")
-bind_rows(
-  svy |>
-    filter(is_nonprofit_wkr & is_hs_industry & !is_homecare) |>
-    calculate_group_sector_stats(educ_cat) |>
-    mutate(sector = "hs_nonprofit"),
-  svy |>
-    # Parrott uses all-govt
-    filter(is_govt_wkr) |>
-    calculate_group_sector_stats(educ_cat) |>
-    mutate(sector = "all_public"),
-  svy |>
-    filter(is_private_wkr) |>
-    calculate_group_sector_stats(educ_cat) |>
-    mutate(sector = "all_private")
-) |>
-  arrange(educ_cat, sector)
-
+# B: in_hs_industry, excluding homecare (and childcare)?
+svy |>
+  filter(is_hs_industry & !is_homecare) |>
+  calculate_group_sector_stats(sector_broad, educ_cat) |>
+  mutate(sector_broad = paste0("hs_", sector_broad))
 
 # What is the median pay for full-time workers in non-profit human services vs public
 # sector for each core occupation group? Note that the public sector is not filtered
@@ -86,15 +62,16 @@ svy_tmp <- svy |>
   # Parrott number seems to not include "Other community and social service specialists"
   filter(OCC != 2025L)
 
+# Note that the public sector is not filtered by industry
 bind_rows(
   svy_tmp |>
-    filter(is_nonprofit_wkr & is_hs_occ_nh) |>
+    filter(sector_broad == "private" & is_hs_industry & is_hs_occ_nh) |>
     calculate_group_sector_stats(occ_group) |>
-    mutate(sector = "hs_nonprofit"),
+    mutate(sector = "hs_private"),
   svy_tmp |>
-    filter(is_city_wkr & is_hs_occ_nh) |>
+    filter(sector_broad == "govt" & is_hs_occ_nh) |>
     calculate_group_sector_stats(occ_group) |>
-    mutate(sector = "all_public")
+    mutate(sector = "hs_govt")
 ) |>
   arrange(occ_group, sector)
 
@@ -103,11 +80,12 @@ svy |>
   filter(
     occ_group %in% c("counselors", "social_workers"),
     educ_cat %in% c("bachelors", "postgrad"),
-    is_nonprofit_wkr | is_govt_wkr
+    is_govt_wkr | (is_private_wkr & is_hs_industry),
+    !is.na(sector_broad)
   ) |>
-  calculate_group_sector_stats(c(sector, occ_group, educ_cat)) |>
-  select(-med_wage_cv, -med_wag_unwt) |>
-  pivot_wider(names_from = sector, values_from = c(med_wage, obs))
+  calculate_group_sector_stats(c(sector_broad, occ_group, educ_cat)) |>
+  select(-med_wag_unwt) |>
+  pivot_wider(names_from = sector_broad, values_from = c(med_wage, obs, med_wage_cv))
 
 svy |>
   filter(

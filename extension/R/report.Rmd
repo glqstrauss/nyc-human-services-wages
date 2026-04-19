@@ -1,0 +1,155 @@
+```{r setup, include=FALSE}
+
+source(here::here("extension/R/11_population.R"))
+
+```
+
+
+
+### Why are private sector human services workers in NYC paid less than their public sector counterparts?
+
+[1-2 sentences on the origins of many nonprofits as community-rooted, democratically/localled controlled, and independent of govt, but that is no longer the case today, when nonprofits are central to the provisioning of NYC's expansive social safety net]
+
+New York City depends heavily on contracts with private (mainly nonprofit) vendors for provisioning human services. In 2025 alone, contract spending was $X billion. Contracts can span for many years. Total contract value for human services standands at \$80 billion (CHECK) as of 2025. As a result, the City's capacity to provide human services is dependent on the capacities of its nonprofit human services providers. At the same time, human services providers are often almost entirely funded by New York City and State contracts (Parrott "COLAs" p.8, Garber "Shadow Govt"). As a result, the capacities of human services providers are constrained by the government funding decisions.
+
+While human services are often characterized as an "essential" safety net in an increasingly unaffordable city, their funding is in a constant state of precarity. Politicians and providers typically agree that current funding levels are not high enough for providers to meet needs. This affects the quality of services, and it also affects the wages and working conditions for the workers who provide them. In 2025, the Center for New York City Affairs released a report, "Moving Beyond COLAs to Salary Parity," which identifies a large wage gap between NYC's private sector human services workers and their public sector counterparts. The report, by James Parrott, ties the pay gap to chronic underfunding, resulting in "wages for human services workers that do not reflect current market conditions, and ... enormous government-nonprofit sector pay disparities for a predominantly women of color workforce.” ([Parrott, 2025, p. 8](zotero://select/library/items/5T3SYWL5)) ([pdf](zotero://open-pdf/library/items/FGZTRLDL?page=9&annotation=2G6846ZI)). Through the 90s and until the 2008 financial crisis, cost-of-living increases (COLAs) in human services contracts were commonly tied to municipal collective bargaining agreements, but the Bloomberg and Cuomo administrations broke this pattern in the 2010s, and most of the political fight since then has revolved around restoring COLAs [Parrot, 2020, pp. 25-26]. Parrott's 2025 report argues that COLAs are not enough, however, as at best they will preserve the existing wage gap with the public sector, while doing nothing to close it. To close the gap, the report argues, New York City should establish a prevailing wage standard that ties human service workers' wages to the civil service titles of their public sector counterparts  [Parrot, 2025, p. 30). These increases would be funded by increasing contract sizes to human services vendors [Parrot, 2025, p. 32).
+
+CLAIM : New York City moved towards reliance on nonprofits for service provision because it was thought to be a more financially stable solution. Nonprofits justify this arrangement on the grounds that it puts control in the hands of communities, and relatedly that they are sites of "expertise" which government lacks. What has emerged instead 
+
+```{r core-hs-private-employment}
+bind_rows(
+  pop_nyc |> 
+    filter(sector == "private") |> 
+    mutate(sector = "All Private"),
+  pop_hs_by_sector |> 
+    filter(sector == "private") |> 
+    mutate(sector = "of which Core Human Services"),
+  pop_hs_by_sector_detail |> 
+    filter(sector == "private") |> 
+    mutate(sector = paste0("of which ", label_sector(sector_detail)))
+) |> 
+  select(sector, YEAR, n) |>
+  pivot_wider(names_from = YEAR, values_from = n) |>
+  rename(Sector = sector) |>
+  knitr::kable(
+    digits = 0,
+    format.args = list(big.mark = ","),
+    caption = "New York City Employment, Core Human Services and All Private Sector"
+  ) |>
+  kableExtra::kable_styling(full_width = FALSE)
+```
+```{r core-hs-public-employment}
+
+sector_level <- pop_nyc |>                  
+  left_join(
+    pop_hs_by_sector |> select(sector, YEAR, n_hs = n),
+    by = c("sector", "YEAR")
+  ) |>
+mutate(label = "All Public Sector")
+
+detail_level <- pop_nyc_by_sector_detail |>
+  left_join(                                                                                                                                    
+    pop_hs_by_sector_detail |> select(sector_detail, YEAR, n_hs = n),
+    by = c("sector_detail", "YEAR")                                                                                                                                
+  ) |>                                  
+  mutate(label = label_sector(sector_detail))
+
+bind_rows(
+  detail_level |> filter(sector_detail %in% c("local_govt", "state_govt", "fed_govt")),
+  sector_level |> filter(sector == "govt")
+) |>
+  filter(YEAR == 2024) |>                                                                                             
+  select(label, n_hs, n) |>
+  rename(Sector=label, `Employment (Core Human Services)`=n_hs, `Employment (All Public Sector)`=n) |>
+  knitr::kable(
+    digits = 0,
+    format.args = list(big.mark = ","),
+    caption = "New York City Public Sector Employment, Core Human Services and All Public Sector"
+  ) |>
+  kableExtra::kable_styling(full_width = FALSE)
+
+```
+This analysis follows the CNYCA report in focusing on "all traditional human services except child care and home healthcare" [Parrot 2025 3].  Concretely, this covers three NAICs industry categories: Individual and family services; Community food and housing, and emergency services; and Vocational and rehabilitation services. Workers in the Child Day Care Services industry, and workers within covered industries whose occupation is home healthcare are excluded. Using this definition, there were 57,870 private sector Core Human Services workers as of 2024, the most recent year for which this data is available.^[The number for 2022 is 57,271, slightly lower than the 60,095 number reported by Parrott. There are several possible reasons for this difference: using place of work vs. place of residence, using non-standard employment status filters for part-time workers, etc. The differences extend to the entire sample: I find private employment of 3,092,599 workers in 2022, whereas Parrott finds 3,115,683, suggesting that the issue is not specific to my definition of "Core Human Services". Although I was unable to recover the exact number, the replicated findings in this analysis are broadly similar to Parrott's, suggesting that these differing definitions should not systematically bias interpretation of results.] 40,096 of these work for nonprofits, and the remaining 17,000 work for for-profit private employers.
+
+By comparison, there are 16,766 workers employed by the public sector in Core Human Services industries. [Need note about what "industries" means in the context of govt...] Of these, the vast majority, 14,731 workers, are employed by local governments (presumably the City of New York). 66% of public sector workers are employed by local government, whereas 87% of public sector Core Human Services workers are local government employees.
+
+```{r sector-naics-totals}
+
+bind_rows(
+  pop_hs_by_sector_naics |> filter(sector == "govt"),
+  pop_hs_by_sector_detail_naics |> filter(sector == "private")
+) |>
+  ungroup() |>
+  mutate(
+      Sector = label_sector(coalesce(sector_detail, sector)),
+      Industry = label_naics(INDNAICS)
+  ) |>
+  select(Sector, Industry, n) |>
+  pivot_wider(names_from = Sector, values_from = n) |>
+  janitor::adorn_totals(where = c("row", "col")) |>
+  knitr::kable(
+    digits = 0,
+    format.args = list(big.mark = ","),
+    caption = "Core Human Services Headcount by Industry Code"
+  ) |>
+  kableExtra::kable_styling(full_width = FALSE)
+
+```
+
+The vast majority of Core Human Services workers are employed in the Individual and family services industry, which covers establishments providing services to children (excluding child care), the elderly, and people with disabilities.^[https://www.census.gov/naics/?input=62&chart=2017&details=624110]. Workers at nonprofits account for over 50% of employment in this industry. This is also the only industry with a sizable public sector workforce. Community food and housing, and emergency services is the next largest industry, employing 11,211 workers, 67% of whom work for nonprofits. Vocational rehabilation services covers establishments providing job training services. Workers in this industry comprise less than 2% of all human services workers in NYC.
+
+```{r include=FALSE}
+
+source(here::here("extension/R/12_demographics.R"))
+
+```
+The CNYCA report argues that there is a racial and gender equity case for instituting salary parity between public and private sector human services workers. Parrott compares demographic characteristics of private sector human services workers to the private sector as a whole, showing that the former employs more women, and particularly women of color. What the report does not show is that private sector core human services demographics are very similar to their public sector counterparts. Public and private sector core human services are 73% and 75% women, respectively, while women make up 49% of the overall private sector workforce. 66% of public sector and 63% of private sector human services workers are women of color, compared to 33% of overall private sector workers. The reason for pointing out these similarities is not to discount the equity-based argument for increasing private sector pay. It does, however, suggest that it is the terms of employment that play the biggest role in determining outcomes for workers. Civil service protections and labor rights obtained through collective bargaining may be just as important as standardized salary schedules in protecting workers from systemic bias in the workplace.
+
+```{r sex-race-chart}
+
+sex_race_by_sector |>
+  mutate(metric = factor(METRIC_LABELS[metric], levels = rev(METRIC_LABELS))) |>
+  ggplot(aes(x = metric, y = pct, fill = label)) +
+  geom_col(position = "dodge") +
+  coord_flip() +
+  scale_y_continuous(labels = scales::percent) +
+  scale_fill_manual(values = unname(role_colors)) +
+  labs(x = NULL, y = NULL, fill = NULL) +
+  theme_minimal()
+
+sex_race_by_sector |>
+  mutate(
+    metric = factor(METRIC_LABELS[metric]),
+    pct = pct * 100
+  ) |>
+  pivot_wider(names_from = label, values_from = c(pct)) |>
+  knitr::kable(
+    digits = 1,
+    format.args = list(big.mark = ",")
+  ) |>
+  kableExtra::kable_styling(full_width = FALSE)
+
+```
+
+
+```{r educat-chart}
+
+bind_rows(
+  educat_hs_by_sector |> mutate(group = paste0("Core Human Services (", label_sector(sector), ")")),
+  educat_all_by_sector |> filter(sector == "private") |> mutate(group = "All NYC Private")
+) |> 
+  ungroup() |> 
+  select(-sector, -prop_se) |>
+  mutate(
+    prop = prop * 100,
+    `Education Level` = EDUCAT_LABELS[educ_cat],
+    .keep = "unused"
+  ) |>
+  pivot_wider(names_from = group, values_from = prop) |>
+  janitor::adorn_totals(where = c("row")) |>
+  knitr::kable(
+    digits = 1,
+    format.args = list(big.mark = ",")
+  ) |>
+  kableExtra::kable_styling(full_width = FALSE)
+```

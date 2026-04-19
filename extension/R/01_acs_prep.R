@@ -6,33 +6,20 @@
 
 source(here::here("extension/R/00_setup.R"))
 
-ANALYSIS_YEAR <- 2022L
-IPUMS_DDI <- file.path(RAW_DIR, "ipums", "usa_00007.xml")
-IPUMS_DAT <- file.path(RAW_DIR, "ipums", "usa_00007.dat.gz")
+IPUMS_DDI <- file.path(RAW_DIR, "ipums", "usa_00012.xml")
+IPUMS_DAT <- file.path(RAW_DIR, "ipums", "usa_00012.dat.gz")
 INDNAICS_XWALK <- file.path(
   RAW_DIR, "ipums", "indnaics_crosswalk_2000_onward_with_code_descriptions.csv"
 )
 
-# ── OCC codes (2018 Census occupation codes) ─────────────────────────────────
-# Source: 2018 Census Occupation Code List (Census Bureau)
+# ── OCC codes (2010 Census occupation codes) ─────────────────────────────────
+# Source: 2010 Census Occupation Code List (Census Bureau)
 # https://www.bls.gov/ooh/
 
-# Core human services professional occupations (KEEP)
-OCC_COUNSELORS <- c(
-  2001L, # Substance abuse and behavioral disorder counselors
-  2002L, # Educational, guidance, and career counselors and advisors
-  2003L, # Marriage and family therapists
-  2004L, # Mental health counselors
-  2005L, # Rehabilitation counselors
-  2006L # Counselors, all other
-)
+# Core human services professional occupations
+OCC_COUNSELORS <- c(2000L)
 
-OCC_SOCIAL_WORKERS <- c(
-  2011L, # Child, family, and school social workers
-  2012L, # Healthcare social workers
-  2013L, # Mental health and substance abuse social workers
-  2014L # Social workers, all other
-)
+OCC_SOCIAL_WORKERS <- c(2010L)
 
 OCC_HS_ASSISTANTS <- c(
   2016L, # Social and human service assistants
@@ -42,11 +29,14 @@ OCC_HS_ASSISTANTS <- c(
 OCC_MANAGERS <- c(
   420L # Social and community service managers
 )
-
 # Non-professional reference occupations (used in Figures 12-13 as benchmarks)
 # These are tricky because they are non HS-specific, and so they only make
 # sense to include when we are filtering to specific industries.
-OCC_ADMIN_SUPPORT <- c(5740L, 5860L, 5940L) # secretaries, office clerks, admin support
+OCC_ADMIN_SUPPORT <- c(
+  5700,  # Secretaries and Administrative Assistants
+  5860,  # Office Clerks, General
+  5940   # Office and Administrative Support Workers, All Other
+) 
 OCC_JANITORS <- c(
   4200L, # First-Line Supervisors Of Housekeeping And Janitorial Workers
   4220L, # Janitors and building cleaners
@@ -63,9 +53,8 @@ OCC_FOOD <- c(
   4140L # Dishwashers
 )
 OCC_HOMECARE <- c(
-  3601L, # Home health aides
-  3602L, # Personal care aides
-  3603L # Nursing assistants
+  3600L, # Nursing, Psychiatric, and Home Health Aides
+  4610L  # Personal care aides
 )
 
 # ACS INCWAGE top-code: 999999. Exclude from wage analysis.
@@ -87,9 +76,9 @@ d <- raw |>
   filter(
     STATEFIP == 36L, # New York State
     COUNTYFIP %in% c(5, 47, 61, 81, 85), # Bronx, Kings, New York, Queens, Richmond
-    YEAR == ANALYSIS_YEAR, # Data extract includes multiple surveys.
+    YEAR %in% c(2022, 2024), # Data extract includes multiple surveys.
     EMPSTAT == 1L, # employed last week
-    GQ %in% 1:2 # exclude group quarters (prisons, dorms)
+    GQ %in% c(1,2,5) # exclude group quarters (prisons, dorms)
   )
 
 message(
@@ -102,16 +91,19 @@ message(
 
 d <- d |>
   mutate(
-    sector = case_when(
+    sector_detail = case_when(
       CLASSWKRD %in% c(13L, 14L) ~ "self_employed",
       CLASSWKRD == 22L ~ "priv_forprofit",
       CLASSWKRD == 23L ~ "priv_nonprofit",
-      CLASSWKRD %in% c(25L, 27L, 28L) ~ "govt",
+      CLASSWKRD == 25L ~ "fed_govt",
+      CLASSWKRD == 27L ~ "state_govt",
+      CLASSWKRD == 28L ~ "local_govt",
       TRUE ~ NA_character_ # Capures NA and Unpaid Family Worker
     ) |> factor(),
-    sector_broad = case_when(
-      sector %in% c("priv_forprofit", "priv_nonprofit") ~ "private",
-      sector == "govt" ~ "govt",
+    sector = case_when(
+      CLASSWKRD %in% c(22L, 23L) ~ "private",
+      CLASSWKRD %in% c(25L, 27L, 28L) ~ "govt",
+      # Ignore self-employed as well as NA and Unpaid Family Worker
       TRUE ~ NA_character_
     ) |> factor()
   )
@@ -121,37 +113,18 @@ d <- d |>
 #
 # Core human services industry definition (Parrott 2025):
 #   NAICS 624 — Social Assistance (6241, 6242, 6243, plus merged codes)
-#   NAICS 623 — Residential Care Facilities (6231, 623M)
-#   EXCLUDE:  6244 — Child Day Care Services
+#
+#   EXCLUDE: NAICS 623 — Residential Care Facilities (6231, 623M)
+#   EXCLUDE: 6244 — Child Day Care Services
 #
 # 62142 is Outpatient Mental Health and Substance Abuse Centers,
 # which cannot be included because it is merged into 6214 ("Outpatient Care Centers")
 # which includes such disparate industries as Kidney Dialysis and HMO Medical Centers.
-# The breakdown of workers in this merged code that we must exclude is:
-#   sector             n   nwt
-#   <fct>          <int> <dbl>
-# 1 govt             109  2915
-# 2 priv_forprofit  1053 26736
-# 3 priv_nonprofit   407 10204
-# 4 self_employed    137  3466
-# 5 NA                 5   110
 #
 # The 623 codes capture group homes, residential mental health/substance abuse
 # facilities, supportive housing, and I/DD residences — all major components
 # of NYC human services contracting (DOHMH, DHS, HRA program areas).
 #
-# This broader definition yields ~61k weighted nonprofit workers, matching the
-# report's Figure 5 total of 60,095. The original ^624-only definition yielded
-# only ~48k, which was too narrow.
-#
-# `parrott_hs` is the primary sample flag for demographics/headcount (Figs 4-8).
-# It does NOT exclude homecare occupations, matching the report's Figure 5
-# total of ~60,095 workers.
-#
-# `parrott_hs_wages` further excludes home health aides, personal care aides, and
-# nursing assistants. Used for wage analysis (Figs 10-15) because "including
-# [homecare workers] would have skewed the wage distribution downward"
-# (Parrott 2025, p. 9).
 # Occupations to EXCLUDE from Social Assistance (home health / personal care)
 # Per Parrott: "all home care and personal care aide occupational employment
 # is excluded even when those workers appear in the individual and family
@@ -159,18 +132,18 @@ d <- d |>
 
 d <- d |>
   mutate(
-    # Social Assistance (624*) + Residential Care (623*)  - Childcare (6244)
-    is_hs_industry = grepl("^62[4]", INDNAICS) &
+    # Social Assistance (624*)  - Childcare (6244)
+    is_hs_industry = grepl("^624", INDNAICS) &
       INDNAICS != 6244,
     occ_group = case_when(
-      OCC %in% OCC_SOCIAL_WORKERS ~ "social_workers",
-      OCC %in% OCC_COUNSELORS ~ "counselors",
-      OCC %in% OCC_HS_ASSISTANTS ~ "hs_assistants",
-      OCC %in% OCC_MANAGERS ~ "managers",
-      OCC %in% OCC_ADMIN_SUPPORT ~ "admin_support",
-      OCC %in% c(OCC_JANITORS, OCC_FOOD, OCC_SECURITY) ~ "janitors_cooks_guards",
+      OCC2010 %in% OCC_SOCIAL_WORKERS ~ "social_workers",
+      OCC2010 %in% OCC_COUNSELORS ~ "counselors",
+      OCC2010 %in% OCC_HS_ASSISTANTS ~ "hs_assistants",
+      OCC2010 %in% OCC_MANAGERS ~ "managers",
+      OCC2010 %in% OCC_ADMIN_SUPPORT ~ "admin_support",
+      OCC2010 %in% c(OCC_JANITORS, OCC_FOOD, OCC_SECURITY) ~ "janitors_cooks_guards",
       # homecare will be *excluded* from wage analysis, but not demo analysis
-      OCC %in% OCC_HOMECARE ~ "homecare",
+      OCC2010 %in% OCC_HOMECARE ~ "homecare",
       TRUE ~ NA_character_
     ) |> factor(),
     is_hs_occ = !is.na(occ_group),
@@ -224,7 +197,7 @@ d <- d |>
 
 d <- d |> mutate(
   parrott_hs = is_hs_industry &
-    !is.na(sector) & sector == "priv_nonprofit",
+    !is.na(sector_detail) & sector_detail == "priv_nonprofit",
   parrott_hs_wages = parrott_hs & occ_group != "homecare"
 )
 
@@ -312,21 +285,15 @@ d <- d |>
 
 # ── 10. Analysis Sector Flags ───────────────────────────────────────────
 
-d <- d |> mutate(
-  # baseline/alt baseline
-  is_private_wkr = sector %in% c("priv_forprofit", "priv_nonprofit"),
-  is_govt_wkr = sector == "govt",
-  is_city_wkr = CLASSWKRD == 28L,
-  is_forprofit_wkr = sector == "priv_forprofit",
-  is_nonprofit_wkr = sector == "priv_nonprofit",
-  # for govt-level breakdown showing dominance of local govt
-  govt_level = case_when(
-    CLASSWKRD == 25L ~ "federal",
-    CLASSWKRD == 27L ~ "state",
-    CLASSWKRD == 28L ~ "local",
-    TRUE ~ NA_character_
-  )
-)
+# TODO: Remove once factored out everywhere. Leaving as comment for now....
+# d <- d |> mutate(
+# baseline/alt baseline
+# is_private_wkr = sector %in% c("priv_forprofit", "priv_nonprofit"),
+# is_govt_wkr = sector == "govt",
+# is_city_wkr = CLASSWKRD == 28L,
+# is_forprofit_wkr = sector == "priv_forprofit",
+# is_nonprofit_wkr = sector == "priv_nonprofit",
+# )
 
 # ── Three-way analysis sector variable ────────────────────────────────────
 #   "hs_nonprofit"   = core human services nonprofit workers
@@ -341,14 +308,14 @@ d <- d |>
   mutate(
     parrott_analysis_sector = case_when(
       parrott_hs ~ "hs_nonprofit",
-      sector == "govt" ~ "govt",
-      sector == "priv_forprofit" ~ "priv_forprofit",
+      sector_detail == "govt" ~ "govt",
+      sector_detail == "priv_forprofit" ~ "priv_forprofit",
       TRUE ~ NA_character_
     ) |> factor(levels = c("hs_nonprofit", "govt", "priv_forprofit")),
     parrott_analysis_sector_wages = case_when(
       parrott_hs_wages ~ "hs_nonprofit",
-      sector == "govt" ~ "govt",
-      sector == "priv_forprofit" ~ "priv_forprofit",
+      sector_detail == "govt" ~ "govt",
+      sector_detail == "priv_forprofit" ~ "priv_forprofit",
       TRUE ~ NA_character_
     ) |> factor(levels = c("hs_nonprofit", "govt", "priv_forprofit"))
   )
@@ -380,5 +347,5 @@ d <- d |>
 
 # ── 12. Save ──────────────────────────────────────────────────────────────────
 
-saveRDS(d, file.path(PROC_DIR, "acs_prepared.rds"))
+saveRDS(d, file.path(PROC_DIR, paste0("acs_prepared.rds")))
 message(paste("Saved acs_prepared.rds (", format(nrow(d), big.mark = ","), "rows)."))

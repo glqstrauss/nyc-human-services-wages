@@ -3,7 +3,8 @@ source(here::here("extension/R/00_setup.R"))
 acs <- readRDS(file.path(PROC_DIR, "acs_prepared.rds"))
 
 svy <- acs |>
-  haven::zap_labels() |> # Breaks survey_median
+  haven::zap_labels() |>
+  filter(!is.na(sector)) |>  # ignore self employed, unemployed etc
   as_survey_rep(
     weights = PERWT,
     repweights = matches("REPWTP[0-9]+"),
@@ -11,83 +12,54 @@ svy <- acs |>
     mse = TRUE
   )
 
-# What percent of workers in is_hs_industry are women and/or people of color?
-svy |>
-  filter(
-    !is.na(sector_broad) & # only govt vs priv
-      is_hs_industry
-  ) |>
-  group_by(sector_broad) |>
-  summarize(
-    pct_women = survey_mean(female),
-    pct_poc = survey_mean(poc),
-    obs = unweighted(n())
-  )
+svy <- svy |> filter(YEAR == 2024)
 
-# What percent of workers in core HS occ are women and/or POC?
-svy |>
-  filter(!is.na(sector_broad), is_hs_industry, is_hs_occ_nh) |>
-  group_by(sector_broad) |>
-  summarize(
-    pct_women = survey_mean(female),
-    pct_poc = survey_mean(poc),
-    obs = unweighted(n())
-  )
+calc_demo_ratios <- function(df, label) {
+  df |>
+    summarize(                                                                                                                                    
+      pct_female       = survey_ratio(female, 1),
+      pct_male         = survey_ratio(!female, 1),                                                                                                
+      pct_female_poc   = survey_ratio(female & poc, 1),
+      pct_male_poc     = survey_ratio(!female & poc, 1),                                                                                          
+      pct_female_white = survey_ratio(female & !poc, 1),                                                                                          
+      pct_male_white   = survey_ratio(!female & !poc, 1)
+    ) |>                                                                                                                                          
+    pivot_longer(
+      cols      = !ends_with("_se"),
+      names_to  = "metric",                                                                                                                       
+      values_to = "pct"
+    ) |>                                                                                                                                          
+    select(metric, pct) |>
+    mutate(label = label)
+}
 
-# What percent of workers in is_hs_industry are women x POC (crosstab)?
-svy |>
-  filter(!is.na(sector_broad), is_hs_industry) |>
-  group_by(sector_broad, gender_race) |>
-  summarize(
-    prop = survey_prop()
-  ) |>
-  pivot_wider(
-    names_from = sector_broad,
-    values_from = c(prop, prop_se)
-  )
-
-# And for the public vs private sector as a whole
-svy |>
-  filter(!is.na(sector_broad)) |>
-  group_by(sector_broad, gender_race) |>
-  summarize(
-    prop = survey_prop()
-  ) |>
-  pivot_wider(
-    names_from = sector_broad,
-    values_from = c(prop, prop_se)
-  )
+sex_race_by_sector <- bind_rows (
+  calc_demo_ratios(svy |> filter(sector == "private"), "All Private Sector"),
+  calc_demo_ratios(svy |> filter(sector == "govt", is_hs_industry, !is_homecare), "Public Sector Human Services"),
+  calc_demo_ratios(svy |> filter(sector == "private", is_hs_industry, !is_homecare), "Private Sector Human Services")
+)
 
 # EDUCATION AND EXPERIENCE ------------------------------------------------------------
 
 # What percent of workers in is_hs_industry have each level of education?
-svy |>
-  filter(!is.na(sector_broad), is_hs_industry) |>
-  group_by(sector_broad, educ_cat) |>
+educat_hs_by_sector <- svy |>
+  filter(is_hs_industry, !is_homecare) |>
+  group_by(sector, educ_cat) |>
   summarize(
     prop = survey_prop(),
-  ) |>
-  pivot_wider(
-    names_from = sector_broad,
-    values_from = c(prop, prop_se)
   )
 
-# What percent of workers in is_hs_occ_nh have each level of education?
-svy |>
-  filter(!is.na(sector_broad), is_hs_industry, is_hs_occ_nh) |>
-  group_by(sector_broad, educ_cat) |>
+educat_all_by_sector <- svy |>
+  group_by(sector, educ_cat) |>
   summarize(
-    prop = survey_prop()
-  ) |>
-  pivot_wider(
-    names_from = sector_broad,
-    values_from = c(prop, prop_se)
+    prop = survey_prop(),
   )
+
 
 # What is the median age of workers in is_hs_occ_nh, by sector?
-svy |>
-  filter(!is.na(sector_broad), is_hs_industry, is_hs_occ_nh) |>
-  group_by(sector_broad) |>
+age_hs_by_sector <- svy |>
+  filter(is_hs_industry, !is_homecare) |>
+  group_by(sector) |>
   summarize(
     age_median = survey_median(AGE),
   )
@@ -98,84 +70,53 @@ svy |>
 # https://economics.stackexchange.com/questions/53650
 
 # What is the average experience of workers in is_hs_industry, by sector?
-svy |>
-  filter(!is.na(sector_broad), is_hs_industry) |>
-  group_by(sector_broad) |>
+avg_exp_hs_by_sector <- svy |>
+  filter(is_hs_industry, !is_homecare) |>
+  group_by(sector) |>
   summarize(
     avg_exp = survey_mean(experience),
     obs = unweighted(n())
   )
 
-# What is the average experience of workers in is_hs_occ, by sector?
-svy |>
-  filter(!is.na(sector_broad), is_hs_industry, is_hs_occ_nh) |>
-  group_by(sector_broad) |>
+# What is the average experience in the private sector?
+avg_exp_priv_sector <- svy |>
+  filter(sector == "private") |>
   summarize(
     avg_exp = survey_mean(experience),
     obs = unweighted(n())
   )
 
-# What is the average "experience" in the private sector?
-svy |>
-  filter(sector_broad == "private") |>
-  summarize(
-    avg_exp = survey_mean(experience),
-    obs = unweighted(n())
-  )
-
-# What is the average experience for is_hs_occ, by sector and education level?
-table123_experience_occ <- bind_rows(
-  svy |>
-    filter(!is.na(sector_broad), is_hs_industry, is_hs_occ) |>
-    group_by(sector_broad, educ_cat) |>
+# What is the average experience for hs industry by sector and education level?
+avg_exp_hs_by_sector_educ_cat <- svy |>
+    filter(is_hs_industry, !is_homecare) |>
+    group_by(sector, educ_cat) |>
     summarize(
       avg_exp = survey_mean(experience),
       obs = unweighted(n())
-    ),
-  svy |>
-    filter(!is.na(sector_broad), is_hs_industry, is_hs_occ) |>
-    group_by(sector_broad) |>
-    summarize(
-      avg_exp = survey_mean(experience),
-      obs = unweighted(n())
-    ) |>
-    mutate(educ_cat = "all")
-) |> pivot_wider(
-  names_from = sector_broad,
-  values_from = c(avg_exp, avg_exp_se, obs)
-)
+    )
+
+# What is the average experience for counselors and social workers
+avg_exp_core_hs_by_sector <- svy |>
+  filter(is_hs_industry, occ_group %in% c("counselors", "social_workers")) |>
+  group_by(sector) |>
+  summarize(
+    avg_exp = survey_mean(experience),
+    obs = unweighted(n())
+  )
 
 # What is the average experience for is_hs_occ, looking only at highly educated workers?
-svy |>
+avg_exp_high_educ_hs_by_sector <- svy |>
   filter(
-    !is.na(sector_broad),
     is_hs_industry,
-    is_hs_occ,
+    !is_homecare,
     educ_cat %in% c("bachelors", "postgrad"),
   ) |>
-  group_by(sector_broad) |>
+  group_by(sector) |>
   summarize(
     avg_exp = survey_mean(experience),
     obs = unweighted(n())
   ) |>
   pivot_wider(
-    names_from = sector_broad,
-    values_from = c(avg_exp, avg_exp_se, obs)
-  )
-
-# What is the average experience for is_hs_industry, looking only at highly educated workers?
-svy |>
-  filter(
-    !is.na(sector_broad),
-    is_hs_industry,
-    educ_cat %in% c("bachelors", "postgrad"),
-  ) |>
-  group_by(sector_broad) |>
-  summarize(
-    avg_exp = survey_mean(experience),
-    obs = unweighted(n())
-  ) |>
-  pivot_wider(
-    names_from = sector_broad,
+    names_from = sector,
     values_from = c(avg_exp, avg_exp_se, obs)
   )

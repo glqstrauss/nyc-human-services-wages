@@ -105,10 +105,9 @@ core_sa_emp_by_occ |>
   ggplot(aes(x = pool, y = emp, fill = occ_group)) +
   geom_col(position = "dodge") +
   geom_text(
-    aes(label = occ_group),
-    position = position_dodge(width = 0.9),
-    vjust = -0.5,
-    size = 6
+    aes(label = round(emp)),
+    position = position_dodge(width = 20),
+    vjust = -1
   ) +
   scale_y_continuous(labels = scales::comma) +
   labs(
@@ -118,7 +117,7 @@ core_sa_emp_by_occ |>
     fill = "Occupation group"
   ) +
   theme_minimal() +
-  theme(legend.position = "none", text = element_text(size = 36))
+  theme(legend.position = "bottom")
 
 # faceted pie chart of occupational distribution in 2000 vs 2022
 
@@ -147,6 +146,7 @@ core_sa_emp_by_occ |>
     strip.text = element_text(size = 14, face = "bold"),
     text = element_text(size = 14)
   )
+
 
 core_sa_occs_emp |>
   filter(pool %in% c(2000L, 2022L)) |>

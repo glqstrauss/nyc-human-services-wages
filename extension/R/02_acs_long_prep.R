@@ -20,7 +20,8 @@ OCC_MANAGERS <- c(
 )
 
 OCC_HOMECARE <- c(
-  3600L
+  3600L, # Nursing, Psychiatric, and Home Health Aides
+  4610L  # Personal care aides
 )
 
 # CPI-W
@@ -100,16 +101,23 @@ d |>
 # ── Sector variable ────────────────────────────────────────────────────────--
 # Based on CLASSWKRD (detailed class of worker)
 # https://usa.ipums.org/usa-action/variables/CLASSWKR#codes_section
-
 d <- d |>
   mutate(
-    sector = case_when(
+    sector_detail = case_when(
       CLASSWKRD %in% c(13L, 14L) ~ "self_employed",
       CLASSWKRD == 22L ~ "priv_forprofit",
       CLASSWKRD == 23L ~ "priv_nonprofit",
-      CLASSWKRD %in% c(25L, 27L, 28L) ~ "govt",
+      CLASSWKRD == 25L ~ "fed_govt",
+      CLASSWKRD == 27L ~ "state_govt",
+      CLASSWKRD == 28L ~ "local_govt",
       TRUE ~ NA_character_ # Capures NA and Unpaid Family Worker
     ) |> factor(),
+    sector_broad = case_when(
+      CLASSWKRD %in% c(22L, 23L) ~ "private",
+      CLASSWKRD %in% c(25L, 27L, 28L) ~ "govt",
+      # Ignore self-employed as well as NA and Unpaid Family Worker
+      TRUE ~ NA_character_
+    ) |> factor()
   )
 
 d |>
@@ -136,7 +144,7 @@ d |>
   filter(
     grepl("^624", INDNAICS),
     INDNAICS != "6244", # exclude childcare
-    sector %in% c("priv_nonprofit", "govt")
+    sector_broad %in% c("private", "govt")
   ) |>
   group_by(INDNAICS, YEAR) |>
   summarize(n = sum(PERWT)) |>
@@ -222,21 +230,22 @@ d <- d |>
 
 # ── 10. Analysis Sector Flags ───────────────────────────────────────────
 
-d <- d |> mutate(
-  # baseline/alt baseline
-  is_private_wkr = sector %in% c("priv_forprofit", "priv_nonprofit"),
-  is_govt_wkr = sector == "govt",
-  is_city_wkr = CLASSWKRD == 28L,
-  is_forprofit_wkr = sector == "priv_forprofit",
-  is_nonprofit_wkr = sector == "priv_nonprofit",
-  # for govt-level breakdown showing dominance of local govt
-  govt_level = case_when(
-    CLASSWKRD == 25L ~ "federal",
-    CLASSWKRD == 27L ~ "state",
-    CLASSWKRD == 28L ~ "local",
-    TRUE ~ NA_character_
-  )
-)
+# TODO remove
+# d <- d |> mutate(
+#   # baseline/alt baseline
+#   is_private_wkr = sector %in% c("priv_forprofit", "priv_nonprofit"),
+#   is_govt_wkr = sector == "govt",
+#   is_city_wkr = CLASSWKRD == 28L,
+#   is_forprofit_wkr = sector == "priv_forprofit",
+#   is_nonprofit_wkr = sector == "priv_nonprofit",
+#   # for govt-level breakdown showing dominance of local govt
+#   govt_level = case_when(
+#     CLASSWKRD == 25L ~ "federal",
+#     CLASSWKRD == 27L ~ "state",
+#     CLASSWKRD == 28L ~ "local",
+#     TRUE ~ NA_character_
+#   )
+# )
 
 # Adjust wadges for inflation using CPI-W
 
