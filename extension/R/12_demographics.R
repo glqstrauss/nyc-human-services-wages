@@ -113,10 +113,14 @@ avg_exp_high_educ_hs_by_sector <- svy |>
   ) |>
   group_by(sector) |>
   summarize(
-    avg_exp = survey_mean(experience),
+    avg_exp = survey_mean(experience, vartype = "se"),
     obs = unweighted(n())
   ) |>
   pivot_wider(
     names_from = sector,
     values_from = c(avg_exp, avg_exp_se, obs)
+  ) |>
+  mutate(
+    diff=avg_exp_govt - avg_exp_private,
+    diff_se=sqrt(avg_exp_se_govt^2 + avg_exp_se_private^2)
   )

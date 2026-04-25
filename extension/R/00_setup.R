@@ -52,7 +52,8 @@ EDUCAT_LABELS <- c(
   hs           = "High School",
   some_college = "Some College",
   bachelors    = "Bachelor's Degree",
-  postgrad     = "Postgraduate Degree"
+  postgrad     = "Postgraduate Degree",
+  all          = "All"
 )
 
 label_sector <- function(x) unname(SECTOR_LABELS[as.character(x)])

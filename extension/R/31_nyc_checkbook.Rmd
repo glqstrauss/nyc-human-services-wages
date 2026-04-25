@@ -1,0 +1,104 @@
+---
+title: "31_nyc_checkbook"
+output: html_document
+---
+
+```{r}
+
+source(here::here("extension/R/00_setup.R"))
+
+library(ggplot2)
+
+raw <- readr::read_csv(file.path(RAW_DIR, "nyc_checkbook", "registered_human_services_contracts_20260420.csv"))
+
+df <- raw |>
+  janitor::clean_names()
+df |> summarize(curr=sum(prime_contract_current_amount))
+
+
+df <- df |>
+  filter(
+    prime_contracting_agency %in% c(
+      "Department of Social Services",
+      "Department of Health and Mental Hygiene",
+      "Department of Small Business Services",
+      "Department for the Aging",
+      "Department of Homeless Services",
+      "Administration for Children's Services",
+      "OFFICE OF CRIMINAL JUSTICE",
+      "Department of Youth and Community Development"
+    )
+  ) |>
+  filter(
+    vendor_record_type == "Prime Vendor"
+  ) |>
+  mutate(
+    prime_contract_current_amount_bucket=case_when(
+      prime_contract_current_amount < 10^4 ~ "Less than $10,000",
+      prime_contract_current_amount < 10^6 ~ "$10,000 - $1 million",
+      prime_contract_current_amount < 5*10^6 ~ "$1-5 million",
+      prime_contract_current_amount < 10^7 ~ "$5-10 million",
+      prime_contract_current_amount < 50*10^7 ~ "$10-50 million",
+      TRUE ~ "> $50 million",
+    )
+  )
+colnames(df)
+view(df)
+nrow(df)
+
+
+# How large are contracts?
+df |>
+  summarize(
+    n=n(),
+    bucket_total=sum(prime_contract_current_amount),
+    .by=prime_contract_current_amount_bucket
+  ) |>
+  mutate(prop=bucket_total/sum(bucket_total))
+
+# How long are contracts?
+df |>
+  filter(
+    prime_contract_current_amount >= 50*10^7
+  ) |>
+  mutate(
+    contract_length_years= prime_contract_end_date - prime_contract_start_date
+  ) |>
+  summarize(
+    # outliers?
+    med_length=median(contract_length_years)
+  )
+
+df |>
+  arrange(desc(prime_contract_current_amount))
+#  select(prime_vendor, prime_contract_current_amount, prime_contract_award_method, prime_contract_start_date, prime_contract_end_date, prime_contracting_agency)
+
+view(df)
+
+ggplot(df |> filter(prime_contract_original_amount), aes(x=prime_contract_original_amount)) + geom_density()
+
+```
+
+
+```{r}
+
+raw <- readr::read_csv(file.path(RAW_DIR, "omb", "adopt24-expense.csv")) |> janitor::clean_names()
+view(raw |> summarize(n=n(), .by=agency_name))
+
+view(df)
+df <- raw |>
+  filter(
+    agency_name %in% c(
+      "ADMIN FOR CHILDREN'S SERVICES",
+      "DEPARTMENT FOR THE AGING",
+      "DEPARTMENT OF SOCIAL SERVICES",
+      "DEPARTMENT OF HOMELESS SERVICES",
+      "OFFICE OF CRIMINAL JUSTICE",
+      "DEPARTMENT OF YOUTH & COMMUNITY DEV",
+      "DEPARTMENT OF HEALTH AND MENTAL HYGIENE",
+      "DEPARTMENT OF SMALL BUSINESS SERVICES"
+    )
+  )
+
+df |> summarize(n=n(), .by = object_class_name)
+```

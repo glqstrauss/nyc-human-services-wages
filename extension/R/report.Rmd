@@ -137,8 +137,32 @@ sex_race_by_sector |>
 bind_rows(
   educat_hs_by_sector |> mutate(group = paste0("Core Human Services (", label_sector(sector), ")")),
   educat_all_by_sector |> filter(sector == "private") |> mutate(group = "All NYC Private")
-) |> 
-  ungroup() |> 
+) |>
+  ungroup() |>
+  filter(educ_cat != "all") |>
+  select(-sector, -prop_se) |>
+  mutate(
+    educ_cat = factor(EDUCAT_LABELS[educ_cat], levels = rev(EDUCAT_LABELS[names(EDUCAT_LABELS) != "all"]))
+  ) |>
+  ggplot(aes(x = educ_cat, y = prop, fill = group)) +
+  geom_col(position = "dodge") +
+  geom_text(
+    aes(label = scales::percent(prop, accuracy = 1)),
+    position = position_dodge(width = 0.9),
+    hjust = -0.1,
+    size = 3
+  ) +
+  coord_flip() +
+  scale_y_continuous(labels = scales::percent, expand = expansion(mult = c(0, 0.1))) +
+  scale_fill_manual(values = unname(role_colors)) +
+  labs(x = NULL, y = NULL, fill = NULL) +
+  theme_minimal()
+
+bind_rows(
+  educat_hs_by_sector |> mutate(group = paste0("Core Human Services (", label_sector(sector), ")")),
+  educat_all_by_sector |> filter(sector == "private") |> mutate(group = "All NYC Private")
+) |>
+  ungroup() |>
   select(-sector, -prop_se) |>
   mutate(
     prop = prop * 100,
@@ -152,4 +176,51 @@ bind_rows(
     format.args = list(big.mark = ",")
   ) |>
   kableExtra::kable_styling(full_width = FALSE)
+
+```
+
+
+```{r}
+bind_rows(
+avg_exp_hs_by_sector_educ_cat |> 
+  mutate(
+    avg_exp = if_else(obs < 30, NA_real_, avg_exp),
+    avg_exp_se = if_else(obs < 30, NA_real_, avg_exp_se)
+  ),
+avg_exp_hs_by_sector |> mutate(educ_cat = "all")
+) |>
+  mutate(
+    `Education Level` = EDUCAT_LABELS[educ_cat],
+    sector = label_sector(sector),
+    `Average Experience` = avg_exp,
+    `Std. Error` = avg_exp_se,
+    .keep = "unused", 
+    .before = 1
+  ) |>
+  select(-obs) |>
+  pivot_wider(
+    names_from = sector,
+    values_from = c(`Average Experience`, `Std. Error`),
+    names_glue = "{.value} ({sector})"
+  ) |>
+    knitr::kable(
+    digits = 1,
+    format.args = list(big.mark = ","),
+    caption = "Average experience in core social assistance industries in NYC, by sector"
+  ) |>
+  kableExtra::kable_styling(full_width = FALSE)
+
+```
+```{r exp-gap-higher-ed}
+
+avg_exp_high_educ_hs_by_sector |>
+  select(diff, diff_se) |>
+  rename(`Public - Private (Years)`=diff, `SE`=diff_se) |>
+  knitr::kable(
+    digits = 2,
+    caption = "Difference in Average Experience between Public and Private Sector Human Services Workers in New York City with a Bachelor's Degree or Higher"
+  ) |>
+  kableExtra::kable_styling(full_width = FALSE)
+
+
 ```

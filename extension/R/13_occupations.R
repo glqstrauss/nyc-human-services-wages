@@ -3,6 +3,8 @@ source(here::here("extension/R/00_setup.R"))
 acs <- readRDS(file.path(PROC_DIR, "acs_prepared.rds"))
 
 svy <- acs |>
+  haven::zap_labels() |>
+  filter(!is.na(sector)) |>  # ignore self employed, unemployed etc
   as_survey_rep(
     weights = PERWT,
     repweights = matches("REPWTP[0-9]+"),
