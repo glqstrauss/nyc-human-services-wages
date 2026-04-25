@@ -8,24 +8,23 @@ acs <- acs |> mutate(
     occ_group %in% c("counselors", "social_workers") ~ "counselors & social workers",
     occ_group %in% c("hs_assistants", "managers") ~ "assistants and managers",
     TRUE ~ "other"
-  ),
-  sector_broad = case_when(
-    is_private_wkr ~ "private",
-    is_govt_wkr ~ "government",
-    TRUE ~ "other"
-  ) |> factor(levels = c("private", "government", "other"))
+  )
 )
 
 svy <- acs |>
   haven::zap_labels() |>
   filter(!is.na(pool)) |>
+  filter(!is.na(sector)) |>
   as_survey_rep(
     weights = PERWT_pooled,
     repweights = matches("REPWTP[0-9]+_pooled"),
     type = "ACS",
     mse = TRUE
   )
-y2k <- acs |> filter(YEAR == 2000L)
+y2k <- acs |>
+  filter(YEAR == 2000L) |>
+  filter(!is.na(sector))
+    
 
 calculate_group_emp_and_wages <- function(df_y2k, df_svy, condition, group_vars = c()) {
   y2k_calc <- df_y2k |>
@@ -59,45 +58,47 @@ calculate_group_emp_and_wages <- function(df_y2k, df_svy, condition, group_vars 
 
 private_emp <- calculate_group_emp_and_wages(
   y2k, svy,
-  condition = is_private_wkr
+  condition = sector == "private"
 )
 
 govt_emp <- calculate_group_emp_and_wages(
   y2k, svy,
-  condition = is_govt_wkr
+  condition = sector == "govt"
 )
 
 core_sa_emp <- calculate_group_emp_and_wages(
   y2k, svy,
-  condition = is_private_wkr & is_sa_industry & is_hs_occ
+  condition = sector == "private" & is_hs_industry & is_hs_occ
 )
 
 govt_sa_emp <- calculate_group_emp_and_wages(
   y2k, svy,
-  condition = is_govt_wkr & is_sa_industry & is_hs_occ
+  condition = sector == "govt" & is_hs_industry & is_hs_occ
 )
 
 
 core_sa_emp_by_occ <- calculate_group_emp_and_wages(
   y2k, svy,
-  condition = is_private_wkr & is_sa_industry & is_hs_occ,
+  condition = sector == "private" & is_hs_industry & is_hs_occ,
   group_vars = c(occ_group)
 )
 
 all_sa_emp_by_occ_sector <- calculate_group_emp_and_wages(
   y2k, svy,
-  condition = (is_private_wkr | is_govt_wkr) & is_sa_industry & is_hs_occ,
-  group_vars = c(sector_broad, occ_group_broad)
+  condition = is_hs_industry & is_hs_occ,
+  group_vars = c(sector, occ_group_broad)
 )
 
 all_sa_emp_by_occ_sector |>
   filter(pool %in% c(2000L, 2022L)) |>
-  select(pool, sector_broad, occ_group_broad, emp) |>
+  select(pool, sector, occ_group_broad, emp) |>
   pivot_wider(names_from = pool, values_from = emp, names_prefix = "emp_") |>
   mutate(
     d_emp = emp_2022 / emp_2000 - 1
   )
 
+
+# THESE NEED TO BE CHECKED, MOVED INTO THE REPORT, AND COPY-PASTED TO THE GOOGLE DOC
 
 core_sa_emp_by_occ |>
   filter(pool %in% c(2000L, 2022L)) |>

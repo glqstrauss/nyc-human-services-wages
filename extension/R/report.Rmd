@@ -1,7 +1,8 @@
 ```{r setup, include=FALSE}
 
 source(here::here("extension/R/11_population.R"))
-
+source(here::here("extension/R/12_demographics.R"))
+source(here::here("extension/R/14_wages.R"))
 ```
 
 
@@ -98,11 +99,7 @@ bind_rows(
 
 The vast majority of Core Human Services workers are employed in the Individual and family services industry, which covers establishments providing services to children (excluding child care), the elderly, and people with disabilities.^[https://www.census.gov/naics/?input=62&chart=2017&details=624110]. Workers at nonprofits account for over 50% of employment in this industry. This is also the only industry with a sizable public sector workforce. Community food and housing, and emergency services is the next largest industry, employing 11,211 workers, 67% of whom work for nonprofits. Vocational rehabilation services covers establishments providing job training services. Workers in this industry comprise less than 2% of all human services workers in NYC.
 
-```{r include=FALSE}
 
-source(here::here("extension/R/12_demographics.R"))
-
-```
 The CNYCA report argues that there is a racial and gender equity case for instituting salary parity between public and private sector human services workers. Parrott compares demographic characteristics of private sector human services workers to the private sector as a whole, showing that the former employs more women, and particularly women of color. What the report does not show is that private sector core human services demographics are very similar to their public sector counterparts. Public and private sector core human services are 73% and 75% women, respectively, while women make up 49% of the overall private sector workforce. 66% of public sector and 63% of private sector human services workers are women of color, compared to 33% of overall private sector workers. The reason for pointing out these similarities is not to discount the equity-based argument for increasing private sector pay. It does, however, suggest that it is the terms of employment that play the biggest role in determining outcomes for workers. Civil service protections and labor rights obtained through collective bargaining may be just as important as standardized salary schedules in protecting workers from systemic bias in the workplace.
 
 ```{r sex-race-chart}
@@ -222,5 +219,140 @@ avg_exp_high_educ_hs_by_sector |>
   ) |>
   kableExtra::kable_styling(full_width = FALSE)
 
+
+```
+```{r }
+
+wages_all |> 
+  select(sector, YEAR, med_wage) |>
+  pivot_wider(names_from = YEAR, values_from = med_wage, names_prefix = "med_wage_") |>
+  mutate(
+    percent_change=100*(med_wage_2024/med_wage_2022 - 1),
+    sector=label_sector(sector)
+  ) |>
+  rename(
+    `% Change`=percent_change,
+    Sector=sector,
+    `Median Wage (2022)`=med_wage_2022,
+    `Median Wage (2024)`=med_wage_2024
+  ) |>
+  knitr::kable(
+    digits = 2,
+    format.args = list(big.mark = ","),
+    caption = "Wage Growth in New York City, 2022 to 2024"
+  ) |>
+  kableExtra::kable_styling(full_width = FALSE)
+
+wages_hs |> 
+  select(sector, YEAR, med_wage) |>
+  pivot_wider(names_from = YEAR, values_from = med_wage, names_prefix = "med_wage_") |>
+  mutate(
+    percent_change=100*(med_wage_2024/med_wage_2022 - 1),
+    sector=label_sector(sector)
+  ) |>
+  rename(
+    `% Change`=percent_change,
+    Sector=sector,
+    `Median Wage (2022)`=med_wage_2022,
+    `Median Wage (2024)`=med_wage_2024
+  ) |>
+  knitr::kable(
+    digits = 2,
+    format.args = list(big.mark = ","),
+    caption = "Wage Growth for Core Human Services Workers in New York City, 2022 to 2024"
+  ) |>
+  kableExtra::kable_styling(full_width = FALSE)
+
+
+```
+
+```{r wages-by-educ-cat}
+
+bind_rows(
+  wages_by_educ_all,
+  wages_by_educ_hs
+) |>
+  filter(YEAR == 2024L) |>
+  select(sector, educ_cat, med_wage) |>
+  pivot_wider(names_from = sector, values_from = med_wage) |>
+  mutate(
+    educ_cat=label_educat(educ_cat),
+  ) |>
+  rename(
+    `Education Level`=educ_cat,
+    `All Public Sector`=all_govt,
+    `All Private Sector`=all_private,
+    `Core HS Public Sector`=hs_govt,
+    `Core HS Private Sector`=hs_private
+  ) |>
+  knitr::kable(
+    digits = 2,
+    format.args = list(big.mark = ","),
+    caption = "Wages for Core Human Services Workers in New York City, By Education Level, 2024"
+  ) |>
+  footnote(general = "NA values appear where a subgroup was excluded due to a low observation count.") |>
+  kableExtra::kable_styling(full_width = FALSE)
+  
+
+```
+
+```{r wages-by-occ-group}
+
+wages_by_occ_group |>
+  select(occ_group, YEAR, med_wage, sector) |>
+  pivot_wider(names_from = c(sector, YEAR), values_from = med_wage) |>
+  mutate(hs_govt_change = hs_govt_2024 - hs_govt_2022, .after = 3) |>
+  mutate(hs_private_change = hs_private_2024 - hs_private_2022, .after = 6) |>
+  mutate(occ_group = label_occ(occ_group)) |>
+  knitr::kable(
+    digits = 2,
+    format.args = list(big.mark = ","),
+    caption = "Wages for Core Human Services Workers in New York City, By Sector and Occupation Group, 2024",
+    col.names = c("Occupation Group", "2022", "2024", "Change", "2022", "2024", "Change")
+  ) |>
+  kableExtra::add_header_above(c(" " = 1, "Public Sector" = 3, "Private Sector" = 3)) |>
+  kableExtra::footnote(general = "NA values appear where a subgroup was excluded due to a low observation count.") |>
+  kableExtra::kable_styling(full_width = TRUE)
+
+```
+
+```{r wages-by-educ-occ}
+
+wages_core_occ_by_educ |>
+  filter(YEAR==2022) |>
+  select(sector, med_wage, med_wage_cv) |>
+  pivot_wider(names_from=sector, values_from=c(med_wage, med_wage_cv)) |>
+  select(occ_group, educ_cat, med_wage_govt, med_wage_cv_govt, med_wage_private, med_wage_cv_private) |>
+  mutate(occ_group = label_occ(occ_group), educ_cat = label_educat(educ_cat)) |>
+  knitr::kable(
+    digits = 2,
+    format.args = list(big.mark = ","),
+    caption = "Median Wages for Core Human Services Workers by Occupation and Education Level, NYC 2022",
+    col.names = c("Occupation Group", "Education Level", "Median Wage", "CV", "Median Wage", "CV")
+  ) |>
+  kableExtra::add_header_above(c(" " = 2, "Public Sector" = 2, "Private Sector" = 2)) |>
+  kableExtra::kable_styling(full_width = TRUE)
+
+```
+
+```{r wage-compression}
+
+wages_core_occ_by_exp |>
+  ggplot(aes(x = experience_cat, y = median_wage, fill = sector)) +
+  geom_col(position = "dodge") +
+    geom_text(
+      aes(label = scales::dollar(median_wage, accuracy = 1)),
+      position = position_dodge(width = 0.9),
+      vjust = -0.4,
+      size = 3
+    ) +                                                                                                         
+    scale_y_continuous(labels = scales::dollar, expand = expansion(mult = c(0, 0.1))) +
+  scale_fill_manual(values = unname(role_colors)) +
+  labs(
+    x="Years of Experience",
+    y="Median Wage",
+    title="Median Wages for Core Human Services Workers in New York, by Years of Experience, 2022"
+  ) +
+  theme_minimal()
 
 ```

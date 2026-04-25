@@ -56,9 +56,19 @@ EDUCAT_LABELS <- c(
   all          = "All"
 )
 
+OCC_LABELS <- c(
+  admin_support="Admin Support",
+  counselors="Counselors",
+  hs_assistants="Social and Human Service Assistants, Other Community and Social Service Specialists",
+  janitors_cooks_guards="Janitors, Cooks, and Security",
+  managers="Social and Community Service Managers",
+  social_workers="Social Workers"
+)
+
 label_sector <- function(x) unname(SECTOR_LABELS[as.character(x)])
 label_naics  <- function(x) unname(NAICS_LABELS[as.character(x)])
 label_educat <- function(x) unname(EDUCAT_LABELS[as.character(x)])
+label_occ <- function(x) unname(OCC_LABELS[as.character(x)])
 
 hs_kable <- function(df, caption = NULL, col.names = NULL, ...) {
   knitr::kable(df,

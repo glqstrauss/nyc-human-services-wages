@@ -112,7 +112,7 @@ d <- d |>
       CLASSWKRD == 28L ~ "local_govt",
       TRUE ~ NA_character_ # Capures NA and Unpaid Family Worker
     ) |> factor(),
-    sector_broad = case_when(
+    sector = case_when(
       CLASSWKRD %in% c(22L, 23L) ~ "private",
       CLASSWKRD %in% c(25L, 27L, 28L) ~ "govt",
       # Ignore self-employed as well as NA and Unpaid Family Worker
@@ -144,7 +144,7 @@ d |>
   filter(
     grepl("^624", INDNAICS),
     INDNAICS != "6244", # exclude childcare
-    sector_broad %in% c("private", "govt")
+    sector %in% c("private", "govt")
   ) |>
   group_by(INDNAICS, YEAR) |>
   summarize(n = sum(PERWT)) |>
@@ -153,8 +153,8 @@ d |>
 
 d <- d |>
   mutate(
-    # Social Assistance (624*) + Residential Care (623*)  - Childcare (6244)
-    is_sa_industry = grepl("^624", INDNAICS) &
+    # Social Assistance (624*) - Childcare (6244)
+    is_hs_industry = grepl("^624", INDNAICS) &
       INDNAICS != 6244,
     occ_group = case_when(
       OCC2010 %in% OCC_SOCIAL_WORKERS ~ "social_workers",
@@ -164,7 +164,6 @@ d <- d |>
       TRUE ~ NA_character_
     ) |> factor(),
     is_hs_occ = !is.na(occ_group),
-    is_hs_occ_nh = !is.na(occ_group) & occ_group != "homecare",
   )
 
 # ── Education category ─────────────────────────────────────────────────────--

@@ -23,13 +23,13 @@ svy <- acs |>
 # What is the occupational distribution of workers in is_hs_industry, by sector?
 svy |>
   filter(
-    !is.na(sector_broad),
     is_hs_industry,
+    !is_homecare,
   ) |>
   mutate(
     occ_group = if_else(is.na(occ_group), "other", occ_group)
   ) |>
-  group_by(sector_broad, occ_group) |>
+  group_by(sector, occ_group) |>
   summarize(
     # proportion is a little weird here. Homecare skews
     prop = survey_prop(vartype = "cv"),
@@ -37,9 +37,9 @@ svy |>
     obs = unweighted(n())
   ) |>
   filter(prop_cv < 0.3) |>
-  select(sector_broad, occ_group, prop, prop_cv, n, obs) |>
+  select(sector, occ_group, prop, prop_cv, n, obs) |>
   pivot_wider(
-    names_from = sector_broad,
+    names_from = sector,
     values_from = c(prop, prop_cv, n, obs),
     values_fill = NA_real_
   )
@@ -48,8 +48,9 @@ svy |>
 # These are very small numbers only worth noting as occupations that exist.
 svy |>
   filter(
-    sector_broad == "private",
+    sector == "private",
     is_hs_industry,
+    !is_homecare,
     is.na(occ_group)
   ) |>
   group_by(occ_broad_class) |>
@@ -63,8 +64,9 @@ svy |>
 # These are very small numbers only worth noting as occupations that exist.
 svy |>
   filter(
-    sector_broad == "govt",
+    sector == "govt",
     is_hs_industry,
+    !is_homecare,
     is.na(occ_group)
   ) |>
   group_by(occ_broad_class) |>
