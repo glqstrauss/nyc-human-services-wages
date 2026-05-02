@@ -12,7 +12,10 @@ svy <- acs |>
     mse = TRUE
   )
 
-svy <- svy |> filter(YEAR == 2024)
+svy <- svy |> 
+  filter(YEAR == 2024) |> 
+  # Parrot analysis only considers demographics of full-time workers
+  filter(full_time == TRUE)
 
 calc_demo_ratios <- function(df, label) {
   df |>

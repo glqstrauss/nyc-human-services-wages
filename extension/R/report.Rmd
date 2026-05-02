@@ -68,7 +68,6 @@ bind_rows(
     caption = "New York City Public Sector Employment, Core Human Services and All Public Sector"
   ) |>
   kableExtra::kable_styling(full_width = FALSE)
-
 ```
 This analysis follows the CNYCA report in focusing on "all traditional human services except child care and home healthcare" [Parrot 2025 3].  Concretely, this covers three NAICs industry categories: Individual and family services; Community food and housing, and emergency services; and Vocational and rehabilitation services. Workers in the Child Day Care Services industry, and workers within covered industries whose occupation is home healthcare are excluded. Using this definition, there were 57,870 private sector Core Human Services workers as of 2024, the most recent year for which this data is available.^[The number for 2022 is 57,271, slightly lower than the 60,095 number reported by Parrott. There are several possible reasons for this difference: using place of work vs. place of residence, using non-standard employment status filters for part-time workers, etc. The differences extend to the entire sample: I find private employment of 3,092,599 workers in 2022, whereas Parrott finds 3,115,683, suggesting that the issue is not specific to my definition of "Core Human Services". Although I was unable to recover the exact number, the replicated findings in this analysis are broadly similar to Parrott's, suggesting that these differing definitions should not systematically bias interpretation of results.] 40,096 of these work for nonprofits, and the remaining 17,000 work for for-profit private employers.
 
@@ -107,9 +106,16 @@ The CNYCA report argues that there is a racial and gender equity case for instit
 sex_race_by_sector |>
   mutate(metric = factor(METRIC_LABELS[metric], levels = rev(METRIC_LABELS))) |>
   ggplot(aes(x = metric, y = pct, fill = label)) +
-  geom_col(position = "dodge") +
+  geom_col(position = "dodge", width = 0.7) +
+  geom_text(
+    aes(label = scales::percent(pct, accuracy = 1)),
+    position = position_dodge(width = 0.9),
+    hjust = -0.1,
+    size = 3,
+    width = 0.7
+  ) +
   coord_flip() +
-  scale_y_continuous(labels = scales::percent) +
+  scale_y_continuous(labels = scales::percent, expand = expansion(mult = c(0, 0.1))) +
   scale_fill_manual(values = unname(role_colors)) +
   labs(x = NULL, y = NULL, fill = NULL) +
   theme_minimal()

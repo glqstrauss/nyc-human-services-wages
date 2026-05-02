@@ -39,6 +39,7 @@ pop_hs_by_sector <- svy |>
   ungroup()
 
 
+
 # WHat is the Core HS count by detailed sector (govt level, nonprofit vs forprofit)
 pop_hs_by_sector_detail <- svy |>
   filter(is_hs_industry, !is_homecare) |>
@@ -62,11 +63,9 @@ pop_hs_by_sector_detail_naics <- svy |>
   summarize(n = survey_total(), obs = unweighted(n()))
 
 # How large is the "core occupations" definition of human services workers in NYC?
-# Note that this includes supporting roles like admin staff, food prep and janitorial,
-# not only HS-related occupation codes.
 pop_hs_core_occs <- svy |>
-  filter(is_hs_industry, is_hs_occ_nh, YEAR == 2024) |>
-  group_by(sector_detail) |>
+  filter(occ_group %in% c("social_workers", "counselors", "managers", "hs_assistants"), YEAR == 2024) |>
+  group_by(sector_detail, INDNAICS) |>
   summarize(n = survey_total(), obs = unweighted(n()))
 
 # HOURS -------------------------------------------------------------------------------
